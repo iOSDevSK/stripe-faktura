@@ -56,10 +56,26 @@ def _supplier_from_settings() -> Supplier:
     )
 
 
-def handle_checkout_completed(event: stripe.Event) -> dict:
+def _to_dict(obj):
+    """Konvertuje Stripe StripeObject (v11) na plain dict rekurzívne."""
+    if obj is None:
+        return None
+    if hasattr(obj, "to_dict_recursive"):
+        return obj.to_dict_recursive()
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "_data"):
+        try:
+            return dict(obj._data)
+        except Exception:  # noqa: BLE001
+            pass
+    return obj
+
+
+def handle_checkout_completed(event) -> dict:
     settings = get_settings()
-    # Stripe v11 StripeObject neexposí .get() — konvertujeme na plain dict
-    session = dict(event["data"]["object"])
+    # Stripe v11 StripeObject neexposí .get()/dict() — konvertujeme cez to_dict_recursive
+    session = _to_dict(event["data"]["object"])
     session_id = session["id"]
     metadata = session.get("metadata") or {}
 

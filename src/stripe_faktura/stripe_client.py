@@ -39,16 +39,20 @@ def fetch_line_items(session_id: str) -> list[stripe.LineItem]:
     return list(items.auto_paging_iter())
 
 
-def build_customer(stripe_customer) -> Customer:
-    """Konvertuje Stripe Customer → doménový Customer.
+def _to_dict(obj):
+    if obj is None:
+        return None
+    if hasattr(obj, "to_dict_recursive"):
+        return obj.to_dict_recursive()
+    if isinstance(obj, dict):
+        return obj
+    return obj
 
-    `stripe_customer` môže byť plain dict alebo StripeObject — convertujeme.
-    """
-    if hasattr(stripe_customer, "_data"):
-        stripe_customer = dict(stripe_customer)
+
+def build_customer(stripe_customer) -> Customer:
+    """Konvertuje Stripe Customer → doménový Customer."""
+    stripe_customer = _to_dict(stripe_customer) or {}
     addr = stripe_customer.get("address") or {}
-    if hasattr(addr, "_data"):
-        addr = dict(addr)
     address: Address | None = None
     if addr and addr.get("line1"):
         address = Address(
@@ -60,16 +64,10 @@ def build_customer(stripe_customer) -> Customer:
         )
 
     metadata = stripe_customer.get("metadata") or {}
-    if hasattr(metadata, "_data"):
-        metadata = dict(metadata)
     tax_ids = stripe_customer.get("tax_ids") or {}
-    if hasattr(tax_ids, "_data"):
-        tax_ids = dict(tax_ids)
     vat_id = ""
     tax_data = tax_ids.get("data") if isinstance(tax_ids, dict) else []
     for tid in tax_data or []:
-        if hasattr(tid, "_data"):
-            tid = dict(tid)
         # Slovenské EU VAT začína na "SK..."; akceptujeme akýkoľvek typ eu_vat
         if tid.get("type") == "eu_vat":
             vat_id = tid.get("value") or ""
@@ -91,21 +89,15 @@ def build_line_items(stripe_items, currency: str) -> list[LineItem]:
     Stripe `amount_total` na položke je suma s DPH (qty * unit) v haléroch.
     """
     out: list[LineItem] = []
-    for li in stripe_items:
-        if hasattr(li, "_data"):
-            li = dict(li)
+    for li_raw in stripe_items:
+        li = _to_dict(li_raw) or {}
         qty = int(li.get("quantity") or 1)
         amount_total = int(li.get("amount_total") or 0)
         unit_minor = amount_total // qty if qty else amount_total
         description = li.get("description") or "Produkt"
-        # Uprednostni kanonický názov produktu ak je dostupný
-        price = li.get("price")
-        if hasattr(price, "_data"):
-            price = dict(price)
+        price = _to_dict(li.get("price"))
         if price:
-            prod = price.get("product")
-            if hasattr(prod, "_data"):
-                prod = dict(prod)
+            prod = _to_dict(price.get("product"))
             if isinstance(prod, dict) and prod.get("name"):
                 description = prod["name"]
         out.append(
@@ -121,11 +113,8 @@ def build_line_items(stripe_items, currency: str) -> list[LineItem]:
 
 def session_paid_at(session) -> dt.date:
     """Vráti dátum platby ako UTC dátum."""
-    if hasattr(session, "_data"):
-        session = dict(session)
-    pi = session.get("payment_intent")
-    if hasattr(pi, "_data"):
-        pi = dict(pi)
+    session = _to_dict(session) or {}
+    pi = _to_dict(session.get("payment_intent"))
     created = None
     if isinstance(pi, dict) and pi.get("created"):
         created = pi["created"]

@@ -13,30 +13,50 @@ from __future__ import annotations
 
 import datetime as dt
 
+import httpx
 import stripe
 
 from .config import get_settings
 from .invoice import Address, Customer, LineItem
 
-
-def _init() -> None:
-    stripe.api_key = get_settings().stripe_api_key
-
-
-def fetch_session(session_id: str) -> stripe.checkout.Session:
-    _init()
-    return stripe.checkout.Session.retrieve(session_id, expand=["customer", "payment_intent"])
+# Stripe SDK v11 StripeObject je nepríjemný (StripeObject neexposí .get()/dict()).
+# Voláme Stripe REST API priamo — vracia plain JSON dict ktorý sa s Pythonom správa
+# normálne. SDK necháme len na construct_event() podpisu vo webhook handleri.
 
 
-def fetch_customer(customer_id: str) -> stripe.Customer:
-    _init()
-    return stripe.Customer.retrieve(customer_id, expand=["tax_ids"])
+def _api_get(path: str, params: dict | None = None) -> dict:
+    settings = get_settings()
+    with httpx.Client(timeout=30.0, auth=(settings.stripe_api_key, "")) as c:
+        r = c.get(f"https://api.stripe.com/v1{path}", params=params or {})
+        r.raise_for_status()
+        return r.json()
 
 
-def fetch_line_items(session_id: str) -> list[stripe.LineItem]:
-    _init()
-    items = stripe.checkout.Session.list_line_items(session_id, limit=100)
-    return list(items.auto_paging_iter())
+def fetch_session(session_id: str) -> dict:
+    return _api_get(
+        f"/checkout/sessions/{session_id}",
+        {"expand[]": ["customer", "payment_intent"]},
+    )
+
+
+def fetch_customer(customer_id: str) -> dict:
+    return _api_get(f"/customers/{customer_id}", {"expand[]": ["tax_ids"]})
+
+
+def fetch_line_items(session_id: str) -> list[dict]:
+    items: list[dict] = []
+    starting_after = None
+    while True:
+        params: dict = {"limit": 100}
+        if starting_after:
+            params["starting_after"] = starting_after
+        page = _api_get(f"/checkout/sessions/{session_id}/line_items", params)
+        data = page.get("data") or []
+        items.extend(data)
+        if not page.get("has_more") or not data:
+            break
+        starting_after = data[-1]["id"]
+    return items
 
 
 def _to_dict(obj):
@@ -60,9 +80,9 @@ def _to_dict(obj):
     return obj
 
 
-def build_customer(stripe_customer) -> Customer:
-    """Konvertuje Stripe Customer → doménový Customer."""
-    stripe_customer = _to_dict(stripe_customer) or {}
+def build_customer(stripe_customer: dict) -> Customer:
+    """Konvertuje Stripe Customer (plain JSON dict) → doménový Customer."""
+    stripe_customer = stripe_customer or {}
     addr = stripe_customer.get("address") or {}
     address: Address | None = None
     if addr and addr.get("line1"):
@@ -94,23 +114,21 @@ def build_customer(stripe_customer) -> Customer:
     )
 
 
-def build_line_items(stripe_items, currency: str) -> list[LineItem]:
-    """Konvertuje Stripe LineItems → doménové LineItems.
+def build_line_items(stripe_items: list[dict], currency: str) -> list[LineItem]:
+    """Konvertuje Stripe LineItems (plain JSON dicts) → doménové LineItems.
 
     Stripe `amount_total` na položke je suma s DPH (qty * unit) v haléroch.
     """
     out: list[LineItem] = []
-    for li_raw in stripe_items:
-        li = _to_dict(li_raw) or {}
+    for li in stripe_items or []:
         qty = int(li.get("quantity") or 1)
         amount_total = int(li.get("amount_total") or 0)
         unit_minor = amount_total // qty if qty else amount_total
         description = li.get("description") or "Produkt"
-        price = _to_dict(li.get("price"))
-        if price:
-            prod = _to_dict(price.get("product"))
-            if isinstance(prod, dict) and prod.get("name"):
-                description = prod["name"]
+        price = li.get("price") or {}
+        prod = price.get("product") if isinstance(price, dict) else None
+        if isinstance(prod, dict) and prod.get("name"):
+            description = prod["name"]
         out.append(
             LineItem(
                 description=description,
@@ -122,10 +140,9 @@ def build_line_items(stripe_items, currency: str) -> list[LineItem]:
     return out
 
 
-def session_paid_at(session) -> dt.date:
-    """Vráti dátum platby ako UTC dátum."""
-    session = _to_dict(session) or {}
-    pi = _to_dict(session.get("payment_intent"))
+def session_paid_at(session: dict) -> dt.date:
+    """Vráti dátum platby ako UTC dátum (session je plain JSON dict zo Stripe API)."""
+    pi = session.get("payment_intent")
     created = None
     if isinstance(pi, dict) and pi.get("created"):
         created = pi["created"]

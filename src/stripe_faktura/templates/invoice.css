@@ -66,7 +66,7 @@ h1, h2, h3 { font-weight: 700; margin: 0; }
 }
 .party .name { font-size: 11pt; font-weight: 700; margin-bottom: 1mm; }
 .party .row { font-size: 9pt; color: #333; }
-.party .label { color: #888; display: inline-block; min-width: 16mm; }
+.party .label { color: #888; margin-right: 1.5mm; }
 
 .dates {
   display: flex;

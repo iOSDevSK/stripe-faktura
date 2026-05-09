@@ -39,9 +39,16 @@ def fetch_line_items(session_id: str) -> list[stripe.LineItem]:
     return list(items.auto_paging_iter())
 
 
-def build_customer(stripe_customer: stripe.Customer) -> Customer:
-    """Konvertuje Stripe Customer → doménový Customer."""
+def build_customer(stripe_customer) -> Customer:
+    """Konvertuje Stripe Customer → doménový Customer.
+
+    `stripe_customer` môže byť plain dict alebo StripeObject — convertujeme.
+    """
+    if hasattr(stripe_customer, "_data"):
+        stripe_customer = dict(stripe_customer)
     addr = stripe_customer.get("address") or {}
+    if hasattr(addr, "_data"):
+        addr = dict(addr)
     address: Address | None = None
     if addr and addr.get("line1"):
         address = Address(
@@ -53,9 +60,16 @@ def build_customer(stripe_customer: stripe.Customer) -> Customer:
         )
 
     metadata = stripe_customer.get("metadata") or {}
+    if hasattr(metadata, "_data"):
+        metadata = dict(metadata)
     tax_ids = stripe_customer.get("tax_ids") or {}
+    if hasattr(tax_ids, "_data"):
+        tax_ids = dict(tax_ids)
     vat_id = ""
-    for tid in tax_ids.get("data", []) if isinstance(tax_ids, dict) else []:
+    tax_data = tax_ids.get("data") if isinstance(tax_ids, dict) else []
+    for tid in tax_data or []:
+        if hasattr(tid, "_data"):
+            tid = dict(tid)
         # Slovenské EU VAT začína na "SK..."; akceptujeme akýkoľvek typ eu_vat
         if tid.get("type") == "eu_vat":
             vat_id = tid.get("value") or ""
@@ -71,20 +85,27 @@ def build_customer(stripe_customer: stripe.Customer) -> Customer:
     )
 
 
-def build_line_items(stripe_items: list[stripe.LineItem], currency: str) -> list[LineItem]:
+def build_line_items(stripe_items, currency: str) -> list[LineItem]:
     """Konvertuje Stripe LineItems → doménové LineItems.
 
     Stripe `amount_total` na položke je suma s DPH (qty * unit) v haléroch.
     """
     out: list[LineItem] = []
     for li in stripe_items:
+        if hasattr(li, "_data"):
+            li = dict(li)
         qty = int(li.get("quantity") or 1)
         amount_total = int(li.get("amount_total") or 0)
         unit_minor = amount_total // qty if qty else amount_total
         description = li.get("description") or "Produkt"
         # Uprednostni kanonický názov produktu ak je dostupný
-        if "price" in li and li.price and li.price.get("product"):
-            prod = li.price.get("product")
+        price = li.get("price")
+        if hasattr(price, "_data"):
+            price = dict(price)
+        if price:
+            prod = price.get("product")
+            if hasattr(prod, "_data"):
+                prod = dict(prod)
             if isinstance(prod, dict) and prod.get("name"):
                 description = prod["name"]
         out.append(
@@ -98,9 +119,13 @@ def build_line_items(stripe_items: list[stripe.LineItem], currency: str) -> list
     return out
 
 
-def session_paid_at(session: stripe.checkout.Session) -> dt.date:
+def session_paid_at(session) -> dt.date:
     """Vráti dátum platby ako UTC dátum."""
+    if hasattr(session, "_data"):
+        session = dict(session)
     pi = session.get("payment_intent")
+    if hasattr(pi, "_data"):
+        pi = dict(pi)
     created = None
     if isinstance(pi, dict) and pi.get("created"):
         created = pi["created"]

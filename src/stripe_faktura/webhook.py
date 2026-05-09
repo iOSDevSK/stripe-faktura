@@ -58,7 +58,8 @@ def _supplier_from_settings() -> Supplier:
 
 def handle_checkout_completed(event: stripe.Event) -> dict:
     settings = get_settings()
-    session = event["data"]["object"]
+    # Stripe v11 StripeObject neexposí .get() — konvertujeme na plain dict
+    session = dict(event["data"]["object"])
     session_id = session["id"]
     metadata = session.get("metadata") or {}
 
@@ -95,7 +96,7 @@ def handle_checkout_completed(event: stripe.Event) -> dict:
             stripe_customer = {
                 "name": cd.get("name") or "",
                 "email": cd.get("email") or "",
-                "address": cd.get("address") or {},
+                "address": dict(cd.get("address") or {}),
                 "metadata": {},
                 "tax_ids": {"data": []},
             }

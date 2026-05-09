@@ -13,6 +13,7 @@ Tok pri `checkout.session.completed`:
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import logging
 
@@ -54,6 +55,27 @@ def _supplier_from_settings() -> Supplier:
         logo_url=s.supplier_logo_url,
         logo_path=s.supplier_logo_path,
     )
+
+
+def _decode_client_reference_id(s: str | None, *, max_chars: int = 50) -> str:
+    """Decode base64url client_reference_id (set by frontend modal).
+
+    Frontend posiela URL/popis biznisu user-a base64url-encoded ako
+    client_reference_id. Po decode-u skrátime na max_chars (50 default).
+    Vracia prázdny string ak decode zlyhá.
+    """
+    if not s:
+        return ""
+    try:
+        pad = len(s) % 4
+        padded = s + ("=" * (4 - pad)) if pad else s
+        text = base64.urlsafe_b64decode(padded).decode("utf-8")
+    except Exception:  # noqa: BLE001
+        return ""
+    text = text.strip()
+    if len(text) > max_chars:
+        text = text[: max_chars - 1].rstrip() + "…"
+    return text
 
 
 def _to_dict(obj):
@@ -133,6 +155,19 @@ def handle_checkout_completed(event) -> dict:
         if not items:
             log.warning("session %s nemá žiadne položky; preskakujem", session_id)
             return {"ok": False, "error": "no line items"}
+
+        # Pripojíme user-ov vstup z modalu (URL alebo popis biznisu) do
+        # popisu prvej položky — max 50 znakov.
+        client_input = _decode_client_reference_id(full_session.get("client_reference_id"))
+        if client_input and items:
+            from .invoice import LineItem  # local to avoid cycles
+            head = items[0]
+            items[0] = LineItem(
+                description=f"{head.description} — {client_input}",
+                quantity=head.quantity,
+                unit_price_minor=head.unit_price_minor,
+                currency=head.currency,
+            )
 
         # Atomická alokácia čísla faktúry spolu s DB záznamom
         number = next_invoice_number(db)

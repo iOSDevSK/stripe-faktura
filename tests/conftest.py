@@ -10,7 +10,8 @@ import pytest
 
 def _set_test_env() -> None:
     os.environ.setdefault("STRIPE_API_KEY", "sk_test_dummy")
-    os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_dummy")
+    os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "whsec_dummy_at_least_32_characters_long")
+    os.environ.setdefault("READ_API_KEY", "test_api_key_at_least_16chars")
     os.environ.setdefault("SUPPLIER_NAME", "BELNEM s.r.o.")
     os.environ.setdefault("SUPPLIER_STREET", "Beckovská 5")
     os.environ.setdefault("SUPPLIER_CITY", "Bratislava")

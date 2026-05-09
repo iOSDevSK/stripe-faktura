@@ -5,6 +5,7 @@ from __future__ import annotations
 import smtplib
 from email.message import EmailMessage
 
+from . import pdf_token
 from .config import get_settings
 from .invoice import Invoice
 
@@ -24,11 +25,19 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> None:
         f"<{settings.smtp_from_email or settings.supplier_email}>"
     )
     msg["To"] = invoice.customer.email
+
+    pdf_url = pdf_token.pdf_url(invoice.number) if settings.base_url else ""
+    link_section = (
+        f"\n\nFaktúru môžete kedykoľvek znova stiahnuť na:\n{pdf_url}\n"
+        if pdf_url else ""
+    )
+
     msg.set_content(
         f"Dobrý deň,\n\n"
         f"v prílohe nájdete faktúru č. {invoice.number} za platbu prijatú dňa "
         f"{invoice.issued_at.isoformat()}.\n\n"
-        f"Suma: {invoice.total:.2f} {invoice.currency.upper()}.\n\n"
+        f"Suma: {invoice.total:.2f} {invoice.currency.upper()}."
+        f"{link_section}\n\n"
         f"S pozdravom,\n{settings.supplier_name}\n"
         f"{settings.supplier_email}"
     )

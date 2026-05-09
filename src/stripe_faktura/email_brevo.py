@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from . import pdf_token
 from .config import get_settings
 from .invoice import Invoice
 
@@ -29,11 +30,20 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
     filename = f"faktura-{invoice.number}.pdf"
 
     subject = f"Faktúra č. {invoice.number} — {settings.supplier_name}"
+
+    # Verejný HMAC-podpísaný link pre opätovné stiahnutie (ak je BASE_URL nastavený)
+    pdf_url = pdf_token.pdf_url(invoice.number) if settings.base_url else ""
+    link_section = (
+        f"\n\nFaktúru môžete kedykoľvek znova stiahnuť na:\n{pdf_url}\n"
+        if pdf_url else ""
+    )
+
     body_text = (
         f"Dobrý deň,\n\n"
         f"v prílohe nájdete faktúru č. {invoice.number} za platbu prijatú dňa "
         f"{invoice.issued_at.isoformat()}.\n\n"
-        f"Suma: {invoice.total:.2f} {invoice.currency.upper()}.\n\n"
+        f"Suma: {invoice.total:.2f} {invoice.currency.upper()}."
+        f"{link_section}\n\n"
         f"S pozdravom,\n{settings.supplier_name}\n"
         f"{settings.supplier_email}"
     )

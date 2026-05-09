@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import secrets
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -64,13 +67,31 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_from_name: str = ""
 
-    # Autentifikácia
-    read_api_key: str = ""
+    # Bezpečnosť — POVINNÉ
+    # Bez READ_API_KEY by čítacie endpointy boli verejné a ktokoľvek
+    # by uhádol postupné čísla faktúr (20260001...) a stiahol PII.
+    read_api_key: str
+    # Voliteľný dedikovaný secret pre HMAC PDF tokeny.
+    # Ak prázdne, odvodí sa zo STRIPE_WEBHOOK_SECRET.
+    pdf_token_secret: str = ""
+
+    # Verejná URL aplikácie (pre linky v emaili). Napr. https://faktura.24design.sk
+    base_url: str = ""
 
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "INFO"
+
+    @field_validator("read_api_key")
+    @classmethod
+    def _read_api_key_strong(cls, v: str) -> str:
+        if not v or len(v) < 16:
+            raise ValueError(
+                "READ_API_KEY musí byť nastavený a mať aspoň 16 znakov. "
+                "Vygeneruj cez: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+        return v
 
     @property
     def email_enabled(self) -> bool:
@@ -93,3 +114,8 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings()  # type: ignore[call-arg]
     return _settings
+
+
+def generate_api_key() -> str:
+    """Pomocná funkcia — vygeneruje silný náhodný API kľúč."""
+    return secrets.token_urlsafe(32)

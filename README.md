@@ -159,6 +159,20 @@ SMTP_FROM_NAME=Tvoja firma
 
 ---
 
+## Bezpečnosť — kto môže volať API?
+
+Service má **3 vrstvy ochrany**:
+
+| Vrstva | Endpoint | Mechanizmus |
+|---|---|---|
+| **1** | `POST /webhook/stripe` | Stripe HMAC podpis + timestamp (5 min) — bez `STRIPE_WEBHOOK_SECRET` neprejde žiadny request |
+| **2** | `GET /invoices`, `GET /invoices/{number}` | `X-API-Key` hlavička s `READ_API_KEY` (povinný, min. 16 znakov, validovaný pri štarte) |
+| **3** | `GET /invoices/{number}/pdf` | `X-API-Key` (admin) **alebo** `?token=<HMAC>` (verejný link v emaili zákazníkovi) |
+
+Detail v [SECURITY.md](SECURITY.md). Útočník bez webhook secret-u nezvládne
+sfalšovať platbu, bez API kľúča sa nedostane k zoznamu faktúr, a bez HMAC tokenu
+nestiahne PDF — aj keď čísla faktúr sú predvídateľné (`20260001`, `20260002`...).
+
 ## API endpointy
 
 | Metóda | Cesta | Popis |

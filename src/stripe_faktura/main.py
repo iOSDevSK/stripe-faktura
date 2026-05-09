@@ -6,11 +6,11 @@ import logging
 from typing import Annotated
 
 import stripe
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import desc, select
 
-from . import __version__, webhook
+from . import __version__, pdf_token, webhook
 from .config import get_settings
 from .db import InvoiceRecord, get_session, init_db
 
@@ -39,6 +39,9 @@ def healthz() -> dict:
 
 @app.post("/webhook/stripe")
 async def stripe_webhook(request: Request) -> JSONResponse:
+    """Stripe webhook receiver. Overuje HMAC podpis cez `Stripe-Signature` hlavičku
+    a timestamp toleranciu (5 min) — bez webhook secret-u nikto iný nepošle valid request.
+    """
     settings = get_settings()
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
@@ -69,9 +72,10 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-def _check_read_auth(x_api_key: str | None) -> None:
+def _require_api_key(x_api_key: str | None) -> None:
+    """Overí X-API-Key hlavičku proti READ_API_KEY (povinné)."""
     expected = get_settings().read_api_key
-    if expected and x_api_key != expected:
+    if x_api_key != expected:
         raise HTTPException(status_code=401, detail="neautorizovaný prístup")
 
 
@@ -81,7 +85,8 @@ def list_invoices(
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    _check_read_auth(x_api_key)
+    """Výpis všetkých faktúr — admin operácia, vyžaduje X-API-Key."""
+    _require_api_key(x_api_key)
     db = get_session()
     try:
         rows = db.scalars(
@@ -98,6 +103,7 @@ def list_invoices(
                     "issued_at": r.issued_at.isoformat() if r.issued_at else None,
                     "emailed_at": r.emailed_at.isoformat() if r.emailed_at else None,
                     "stripe_session_id": r.stripe_session_id,
+                    "pdf_url": pdf_token.pdf_url(r.number),
                 }
                 for r in rows
             ]
@@ -111,7 +117,8 @@ def get_invoice(
     number: str,
     x_api_key: Annotated[str | None, Header()] = None,
 ) -> dict:
-    _check_read_auth(x_api_key)
+    """Detail faktúry — admin operácia, vyžaduje X-API-Key."""
+    _require_api_key(x_api_key)
     db = get_session()
     try:
         r = db.scalars(select(InvoiceRecord).where(InvoiceRecord.number == number)).first()
@@ -129,7 +136,7 @@ def get_invoice(
             "stripe_session_id": r.stripe_session_id,
             "stripe_customer_id": r.stripe_customer_id,
             "stripe_payment_intent_id": r.stripe_payment_intent_id,
-            "pdf_url": f"/invoices/{r.number}/pdf",
+            "pdf_url": pdf_token.pdf_url(r.number),
         }
     finally:
         db.close()
@@ -138,9 +145,19 @@ def get_invoice(
 @app.get("/invoices/{number}/pdf")
 def get_invoice_pdf(
     number: str,
+    token: Annotated[str | None, Query()] = None,
     x_api_key: Annotated[str | None, Header()] = None,
 ) -> Response:
-    _check_read_auth(x_api_key)
+    """Stiahnutie PDF — autorizácia jedným z dvoch spôsobov:
+    1. `X-API-Key` hlavička s `READ_API_KEY` (pre admin / interné systémy).
+    2. `?token=<HMAC>` query param (pre verejné linky v emailoch zákazníkom).
+    """
+    settings = get_settings()
+    api_key_ok = x_api_key == settings.read_api_key
+    token_ok = pdf_token.verify_pdf_token(number, token or "")
+    if not (api_key_ok or token_ok):
+        raise HTTPException(status_code=401, detail="neautorizovaný prístup")
+
     db = get_session()
     try:
         r = db.scalars(select(InvoiceRecord).where(InvoiceRecord.number == number)).first()

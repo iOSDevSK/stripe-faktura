@@ -60,12 +60,16 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     """Stripe webhook receiver. Overuje HMAC podpis cez `Stripe-Signature` hlavičku
     a timestamp toleranciu (5 min) — bez webhook secret-u nikto iný nepošle valid request.
     """
+    import json as _json
     settings = get_settings()
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        event = stripe.Webhook.construct_event(
+        # construct_event overuje HMAC podpis a tým nás chráni; jej výsledok ďalej
+        # nepoužívame, lebo Stripe v11 StripeObject je nepríjemný — radšej si payload
+        # parsneme ako čistý JSON dict (rovnaký body, podpis je už overený).
+        stripe.Webhook.construct_event(
             payload=payload,
             sig_header=sig_header,
             secret=settings.stripe_webhook_secret,
@@ -75,14 +79,19 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     except stripe.SignatureVerificationError as e:
         raise HTTPException(status_code=400, detail="neplatný podpis") from e
 
-    event_type = event["type"]
+    try:
+        event_dict = _json.loads(payload.decode("utf-8"))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="neplatný JSON") from e
+
+    event_type = event_dict.get("type")
     if event_type != "checkout.session.completed":
         return JSONResponse({"ok": True, "ignored": event_type})
 
     try:
-        result = webhook.handle_checkout_completed(event)
+        result = webhook.handle_checkout_completed(event_dict)
     except Exception as e:  # noqa: BLE001
-        log.exception("spracovanie webhooku zlyhalo pre event %s", event["id"])
+        log.exception("spracovanie webhooku zlyhalo pre event %s", event_dict.get("id"))
         raise HTTPException(status_code=500, detail="chyba spracovania") from e
 
     return JSONResponse(result)

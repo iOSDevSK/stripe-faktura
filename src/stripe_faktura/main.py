@@ -300,7 +300,7 @@ async def admin_test_send_invoice(
             log.exception("test send-invoice: email zlyhalo")
             email_error = str(e)
 
-    return {
+    response: dict = {
         "ok": True,
         "test_invoice_number": test_number,
         "pdf_size_bytes": len(pdf_bytes),
@@ -308,7 +308,13 @@ async def admin_test_send_invoice(
         "emailed_via": emailed_via,
         "email_error": email_error,
         "customer_email": customer.email,
+        "logo_url": settings.supplier_logo_url,
     }
+    if body.get("include_pdf_base64"):
+        import base64
+
+        response["pdf_base64"] = base64.b64encode(pdf_bytes).decode("ascii")
+    return response
 
 
 @app.get("/invoices/{number}/pdf")

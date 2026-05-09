@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Faktúra č. {{ invoice.number }}</title>
+  <link rel="stylesheet" href="invoice.css">
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    {% if invoice.supplier.logo_url %}
+      <img src="{{ invoice.supplier.logo_url }}" alt="{{ invoice.supplier.name }}">
+    {% else %}
+      <div class="brand-text">{{ invoice.supplier.name }}</div>
+    {% endif %}
+  </div>
+  <div class="title-block">
+    <div class="title">FAKTÚRA</div>
+    <div style="font-size:9pt; color:#888; margin-top:1mm">Daňový doklad</div>
+    <div class="number">č. {{ invoice.number }}</div>
+    {% if invoice.is_paid %}
+      <div class="paid">Uhradené</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="parties">
+  <div class="party">
+    <h3>Dodávateľ</h3>
+    <div class="name">{{ invoice.supplier.name }}</div>
+    <div class="row">{{ invoice.supplier.address.line1 }}</div>
+    <div class="row">{{ invoice.supplier.address.zip }} {{ invoice.supplier.address.city }}, {{ invoice.supplier.address.country }}</div>
+    <div class="row" style="margin-top:2mm"><span class="label">IČO:</span>{{ invoice.supplier.ico }}</div>
+    {% if invoice.supplier.dic %}
+      <div class="row"><span class="label">DIČ:</span>{{ invoice.supplier.dic }}</div>
+    {% endif %}
+    {% if invoice.supplier.vat_id %}
+      <div class="row"><span class="label">IČ DPH:</span>{{ invoice.supplier.vat_id }}</div>
+    {% endif %}
+    {% if invoice.supplier.registration %}
+      <div class="row" style="margin-top:1mm; font-size:8pt; color:#666">{{ invoice.supplier.registration }}</div>
+    {% endif %}
+    <div class="row" style="margin-top:2mm">{{ invoice.supplier.email }}{% if invoice.supplier.phone %} • {{ invoice.supplier.phone }}{% endif %}</div>
+  </div>
+
+  <div class="party">
+    <h3>Odberateľ</h3>
+    <div class="name">{{ invoice.customer.name or invoice.customer.email }}</div>
+    {% if invoice.customer.address %}
+      <div class="row">{{ invoice.customer.address.line1 }}</div>
+      <div class="row">{{ invoice.customer.address.zip }} {{ invoice.customer.address.city }}{% if invoice.customer.address.country %}, {{ invoice.customer.address.country }}{% endif %}</div>
+    {% endif %}
+    {% if invoice.customer.ico %}
+      <div class="row" style="margin-top:2mm"><span class="label">IČO:</span>{{ invoice.customer.ico }}</div>
+    {% endif %}
+    {% if invoice.customer.dic %}
+      <div class="row"><span class="label">DIČ:</span>{{ invoice.customer.dic }}</div>
+    {% endif %}
+    {% if invoice.customer.vat_id %}
+      <div class="row"><span class="label">IČ DPH:</span>{{ invoice.customer.vat_id }}</div>
+    {% endif %}
+    {% if invoice.customer.email %}
+      <div class="row" style="margin-top:2mm">{{ invoice.customer.email }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="dates">
+  <div class="date-box">
+    <div class="label">Dátum vystavenia</div>
+    <div class="value">{{ invoice.issued_at.isoformat() }}</div>
+  </div>
+  <div class="date-box">
+    <div class="label">Dátum dodania (DUZP)</div>
+    <div class="value">{{ invoice.delivered_at.isoformat() }}</div>
+  </div>
+  <div class="date-box">
+    <div class="label">Dátum splatnosti</div>
+    <div class="value">{{ invoice.due_at.isoformat() }}{% if invoice.is_paid %} <span style="color:#198754; font-weight:700">(uhradené)</span>{% endif %}</div>
+  </div>
+</div>
+
+<div class="payment">
+  <div class="row">
+    <div><span class="label">Spôsob úhrady:</span><strong>{{ invoice.payment_method }}</strong></div>
+  </div>
+  <div class="row" style="margin-top:1.5mm">
+    <div><span class="label">IBAN:</span>{{ invoice.supplier.iban }}</div>
+    {% if invoice.supplier.bic %}<div><span class="label">BIC:</span>{{ invoice.supplier.bic }}</div>{% endif %}
+    <div><span class="label">VS:</span>{{ invoice.variable_symbol }}</div>
+    <div><span class="label">KS:</span>0308</div>
+  </div>
+</div>
+
+<table class="items">
+  <thead>
+    <tr>
+      <th>Popis</th>
+      <th class="num">Mn</th>
+      <th class="num">J. cena bez DPH</th>
+      <th class="num">DPH %</th>
+      <th class="num">DPH</th>
+      <th class="num">Cena s DPH</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in invoice.items %}
+      {% set gross = item.total_minor %}
+      {% set base = ((gross * 100) / (100 + invoice.vat_rate)) | int %}
+      {% set vat  = gross - base %}
+      {% set unit_base = (base / item.quantity) | int %}
+      <tr>
+        <td>{{ item.description }}</td>
+        <td class="num">{{ item.quantity }}</td>
+        <td class="num">{{ unit_base | money(item.currency) }}</td>
+        <td class="num">{{ invoice.vat_rate }} %</td>
+        <td class="num">{{ vat | money(item.currency) }}</td>
+        <td class="num">{{ gross | money(item.currency) }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="totals">
+  <table>
+    <tr>
+      <td class="label">Základ DPH</td>
+      <td>{{ invoice.base_amount_minor | money(invoice.currency) }}</td>
+    </tr>
+    <tr>
+      <td class="label">DPH {{ invoice.vat_rate }} %</td>
+      <td>{{ invoice.vat_amount_minor | money(invoice.currency) }}</td>
+    </tr>
+    <tr class="total">
+      <td class="label">Spolu k úhrade</td>
+      <td>{{ invoice.total_minor | money(invoice.currency) }}</td>
+    </tr>
+  </table>
+</div>
+
+<div class="footer-info">
+  <div>Vystavil: {{ invoice.supplier.name }}</div>
+  <div>{{ invoice.supplier.email }}</div>
+</div>
+
+</body>
+</html>

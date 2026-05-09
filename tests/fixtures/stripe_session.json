@@ -1,0 +1,28 @@
+{
+  "id": "evt_test_001",
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_a1b2c3",
+      "object": "checkout.session",
+      "amount_total": 34900,
+      "currency": "eur",
+      "customer": "cus_test_xyz",
+      "customer_details": {
+        "email": "test@acme.sk",
+        "name": "Acme s.r.o.",
+        "address": {
+          "line1": "Hlavná 1",
+          "city": "Košice",
+          "postal_code": "04001",
+          "country": "SK"
+        }
+      },
+      "metadata": {
+        "product": "web_349_eur"
+      },
+      "payment_intent": "pi_test_abc",
+      "created": 1746800000
+    }
+  }
+}

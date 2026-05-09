@@ -59,8 +59,12 @@ def _supplier_from_settings() -> Supplier:
 def _to_dict(obj):
     """Rekurzívne konvertuje Stripe StripeObject (v11) na plain Python dict.
 
-    Stripe SDK v11+ neexposí .get() ani dict() — wrapuje dáta v _data atribúte.
-    Túto funkciu používame namiesto toho.
+    Stripe SDK v11+ má StripeObject ktorý:
+      - neexposí `.get()` ani `dict(obj)`,
+      - má `keys()` method, `__iter__`, `__getitem__`,
+      - private atribúty (_data) sú zatienené `__getattr__` ktorý dvíha
+        AttributeError pre kľúče začínajúce podtržníkom.
+    Túto funkciu preto iterujeme cez verejné `keys()`.
     """
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
@@ -68,8 +72,12 @@ def _to_dict(obj):
         return [_to_dict(x) for x in obj]
     if isinstance(obj, dict):
         return {k: _to_dict(v) for k, v in obj.items()}
-    if hasattr(obj, "_data"):  # StripeObject
-        return _to_dict(obj._data)
+    keys_fn = getattr(obj, "keys", None)
+    if callable(keys_fn):
+        try:
+            return {k: _to_dict(obj[k]) for k in list(keys_fn())}
+        except Exception:  # noqa: BLE001
+            return obj
     return obj
 
 

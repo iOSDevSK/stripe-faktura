@@ -40,15 +40,23 @@ def fetch_line_items(session_id: str) -> list[stripe.LineItem]:
 
 
 def _to_dict(obj):
-    """Rekurzívne konvertuje Stripe StripeObject (v11) na plain dict."""
+    """Rekurzívne konvertuje Stripe StripeObject (v11) na plain dict.
+
+    Stripe v11 StripeObject má `keys()` (verejné) ale `_data` je za
+    `__getattr__` ktorý raisuje pre `_*` mená. Iterujeme cez `keys()`.
+    """
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
     if isinstance(obj, list):
         return [_to_dict(x) for x in obj]
     if isinstance(obj, dict):
         return {k: _to_dict(v) for k, v in obj.items()}
-    if hasattr(obj, "_data"):
-        return _to_dict(obj._data)
+    keys_fn = getattr(obj, "keys", None)
+    if callable(keys_fn):
+        try:
+            return {k: _to_dict(obj[k]) for k in list(keys_fn())}
+        except Exception:  # noqa: BLE001
+            return obj
     return obj
 
 

@@ -12,10 +12,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import desc, select
 
-from . import __version__, pdf_token, webhook
+from . import __version__, email as email_dispatcher
+from . import pdf as pdf_render
+from . import pdf_token, webhook
 from .checkout import CheckoutRequest, create_checkout
 from .config import get_settings
 from .db import InvoiceRecord, get_session, init_db
+from .invoice import Address, Customer, Invoice, LineItem
+from .numbering import variable_symbol_from
 
 log = logging.getLogger("stripe_faktura")
 logging.basicConfig(level=get_settings().log_level)
@@ -194,6 +198,117 @@ def get_invoice(
         }
     finally:
         db.close()
+
+
+@app.post("/admin/test-send-invoice")
+async def admin_test_send_invoice(
+    request: Request,
+    x_api_key: Annotated[str | None, Header()] = None,
+) -> dict:
+    """Admin endpoint pre sanity test PDF + email pipeline.
+
+    NEVYTVÁRA Stripe Customer/Session a NEZAPISUJE do DB ako reálnu faktúru.
+    Slúži na overenie že WeasyPrint správne vyrenderuje SK template
+    a Brevo/SMTP pošle email s prílohou. Vyžaduje X-API-Key.
+
+    Body príklad:
+      {
+        "customer": {
+          "name": "Filip Dvoran",
+          "email": "filip.dvoran@gmail.com",
+          "address": {"line1": "Čilžská 1", "city": "Bratislava", "zip": "82107", "country": "SK"},
+          "ico": "12345678",   // voliteľné
+          "dic": "",           // voliteľné
+          "vat_id": ""         // voliteľné, IČ DPH
+        },
+        "items": [
+          {"description": "Web na kľúč", "quantity": 1, "unit_price_minor": 34900, "currency": "eur"}
+        ],
+        "send_email": true     // ak false, len vráti info o vyrenderovanom PDF
+      }
+    """
+    import datetime as dt
+
+    _require_api_key(x_api_key)
+    settings = get_settings()
+    body = await request.json()
+
+    cust_data = body.get("customer") or {}
+    items_data = body.get("items") or []
+    if not cust_data.get("email"):
+        raise HTTPException(status_code=400, detail="customer.email je povinné")
+    if not items_data:
+        raise HTTPException(status_code=400, detail="items[] musí mať aspoň 1 položku")
+
+    addr_data = cust_data.get("address") or {}
+    customer = Customer(
+        name=cust_data.get("name") or "",
+        email=cust_data.get("email"),
+        address=(
+            Address(
+                line1=addr_data.get("line1", ""),
+                city=addr_data.get("city", ""),
+                zip=addr_data.get("zip", ""),
+                country=addr_data.get("country", "SK"),
+            )
+            if addr_data
+            else None
+        ),
+        ico=cust_data.get("ico") or "",
+        dic=cust_data.get("dic") or "",
+        vat_id=cust_data.get("vat_id") or "",
+    )
+
+    items = [
+        LineItem(
+            description=i["description"],
+            quantity=int(i["quantity"]),
+            unit_price_minor=int(i["unit_price_minor"]),
+            currency=i.get("currency", "eur"),
+        )
+        for i in items_data
+    ]
+
+    today = dt.date.today()
+    test_number = "TEST-" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    invoice = Invoice(
+        number=test_number,
+        variable_symbol=variable_symbol_from(test_number) or "9999999999",
+        issued_at=today,
+        delivered_at=today,
+        due_at=today,
+        supplier=webhook._supplier_from_settings(),
+        customer=customer,
+        items=items,
+        currency=items[0].currency,
+        vat_rate=settings.vat_rate,
+        vat_registered=settings.supplier_vat_registered,
+        payment_method="Platba kartou (Stripe) — TEST",
+        is_paid=True,
+    )
+
+    pdf_bytes = pdf_render.render_invoice_pdf(invoice)
+
+    emailed_via = "none"
+    email_error: str | None = None
+    if body.get("send_email", True) and settings.email_enabled:
+        try:
+            emailed_via = email_dispatcher.send_invoice_email(
+                invoice=invoice, pdf_bytes=pdf_bytes
+            )
+        except Exception as e:  # noqa: BLE001
+            log.exception("test send-invoice: email zlyhalo")
+            email_error = str(e)
+
+    return {
+        "ok": True,
+        "test_invoice_number": test_number,
+        "pdf_size_bytes": len(pdf_bytes),
+        "vat_mode": "platca" if settings.supplier_vat_registered else "neplatca",
+        "emailed_via": emailed_via,
+        "email_error": email_error,
+        "customer_email": customer.email,
+    }
 
 
 @app.get("/invoices/{number}/pdf")

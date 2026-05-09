@@ -57,18 +57,19 @@ def _supplier_from_settings() -> Supplier:
 
 
 def _to_dict(obj):
-    """Konvertuje Stripe StripeObject (v11) na plain dict rekurzívne."""
-    if obj is None:
-        return None
-    if hasattr(obj, "to_dict_recursive"):
-        return obj.to_dict_recursive()
-    if isinstance(obj, dict):
+    """Rekurzívne konvertuje Stripe StripeObject (v11) na plain Python dict.
+
+    Stripe SDK v11+ neexposí .get() ani dict() — wrapuje dáta v _data atribúte.
+    Túto funkciu používame namiesto toho.
+    """
+    if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
-    if hasattr(obj, "_data"):
-        try:
-            return dict(obj._data)
-        except Exception:  # noqa: BLE001
-            pass
+    if isinstance(obj, list):
+        return [_to_dict(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _to_dict(v) for k, v in obj.items()}
+    if hasattr(obj, "_data"):  # StripeObject
+        return _to_dict(obj._data)
     return obj
 
 

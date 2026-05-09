@@ -40,12 +40,15 @@ def fetch_line_items(session_id: str) -> list[stripe.LineItem]:
 
 
 def _to_dict(obj):
-    if obj is None:
-        return None
-    if hasattr(obj, "to_dict_recursive"):
-        return obj.to_dict_recursive()
-    if isinstance(obj, dict):
+    """Rekurzívne konvertuje Stripe StripeObject (v11) na plain dict."""
+    if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
+    if isinstance(obj, list):
+        return [_to_dict(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _to_dict(v) for k, v in obj.items()}
+    if hasattr(obj, "_data"):
+        return _to_dict(obj._data)
     return obj
 
 

@@ -177,11 +177,10 @@ def create_checkout(req: CheckoutRequest) -> dict:
         },
         # billing_address_collection sa neuplatní (Customer ju má), ale pre istotu:
         "billing_address_collection": "auto",
-        # Potlačíme Stripe receipt — SK faktúru si pošleme sami cez Brevo.
-        # (Pozn.: pre úplnú istotu je potrebné aj Account-level Settings →
-        # Customer emails → Successful payments OFF v Stripe dashboarde.)
-        "payment_intent_data": {"receipt_email": ""},
     }
+    # Potlačenie Stripe receipt-u rieši Account-level setting:
+    # Stripe Dashboard → Settings → Customer emails → Successful payments OFF.
+    # Per-session `receipt_email=""` Stripe odmieta ako neplatný email.
     if req.client_reference_id:
         session_args["client_reference_id"] = req.client_reference_id
     if req.allow_promotion_codes:

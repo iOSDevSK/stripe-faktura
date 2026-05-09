@@ -61,6 +61,10 @@ class CheckoutRequest(BaseModel):
     # Voliteľná metadata propagovaná do Checkout Session (napr. project_input)
     metadata: dict[str, str] = Field(default_factory=dict)
 
+    # Stripe-natívne polia ktoré frontend môže nastaviť
+    client_reference_id: str | None = None        # Stripe ho echo-uje vo webhook payload
+    allow_promotion_codes: bool = False           # pre voucher tier (napr. 24design 349 €)
+
     @field_validator("ico")
     @classmethod
     def _validate_ico(cls, v: str | None) -> str | None:
@@ -160,20 +164,30 @@ def create_checkout(req: CheckoutRequest) -> dict:
                 "Stripe odmietol IČ DPH %s pre customer %s: %s", req.vat_id, customer.id, e
             )
 
-    session = stripe.checkout.Session.create(
-        mode="payment",
-        customer=customer.id,
-        line_items=[{"price": req.price_id, "quantity": req.quantity}],
-        success_url=req.success_url,
-        cancel_url=req.cancel_url,
-        metadata={
+    session_args: dict = {
+        "mode": "payment",
+        "customer": customer.id,
+        "line_items": [{"price": req.price_id, "quantity": req.quantity}],
+        "success_url": req.success_url,
+        "cancel_url": req.cancel_url,
+        "metadata": {
             **req.metadata,
             "customer_type": req.customer_type,
             "price_id": req.price_id,
         },
         # billing_address_collection sa neuplatní (Customer ju má), ale pre istotu:
-        billing_address_collection="auto",
-    )
+        "billing_address_collection": "auto",
+        # Potlačíme Stripe receipt — SK faktúru si pošleme sami cez Brevo.
+        # (Pozn.: pre úplnú istotu je potrebné aj Account-level Settings →
+        # Customer emails → Successful payments OFF v Stripe dashboarde.)
+        "payment_intent_data": {"receipt_email": ""},
+    }
+    if req.client_reference_id:
+        session_args["client_reference_id"] = req.client_reference_id
+    if req.allow_promotion_codes:
+        session_args["allow_promotion_codes"] = True
+
+    session = stripe.checkout.Session.create(**session_args)
 
     log.info(
         "vytvorený checkout session %s pre customer %s (%s)",

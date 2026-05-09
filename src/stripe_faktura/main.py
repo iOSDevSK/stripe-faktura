@@ -7,10 +7,13 @@ from typing import Annotated
 
 import stripe
 from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import ValidationError
 from sqlalchemy import desc, select
 
 from . import __version__, pdf_token, webhook
+from .checkout import CheckoutRequest, create_checkout
 from .config import get_settings
 from .db import InvoiceRecord, get_session, init_db
 
@@ -24,6 +27,17 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url=None,
 )
+
+_origins = get_settings().allowed_origins_list
+if _origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=False,
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
+        max_age=3600,
+    )
 
 
 @app.on_event("startup")
@@ -59,15 +73,55 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 
     event_type = event["type"]
     if event_type != "checkout.session.completed":
-        # Potvrdíme príjem bez akcie — Stripe očakáva 2xx
         return JSONResponse({"ok": True, "ignored": event_type})
 
     try:
         result = webhook.handle_checkout_completed(event)
     except Exception as e:  # noqa: BLE001
         log.exception("spracovanie webhooku zlyhalo pre event %s", event["id"])
-        # 5xx spôsobí že Stripe pošle webhook znova — to chceme
         raise HTTPException(status_code=500, detail="chyba spracovania") from e
+
+    return JSONResponse(result)
+
+
+@app.post("/checkout")
+async def create_checkout_session(request: Request) -> JSONResponse:
+    """Vytvorí Stripe Customer + Checkout Session s SK billing údajmi.
+
+    Bezpečnosť (defense in depth):
+      - Origin musí byť v ALLOWED_ORIGINS (CORS middleware už blokuje cudzie origins,
+        ale serverový check je dodatočná vrstva).
+      - price_id musí byť v ALLOWED_PRICE_IDS — útočník nemôže vytvoriť 0 € session.
+      - Validácia formátu IČO/DIČ/IČ DPH cez pydantic.
+    """
+    settings = get_settings()
+
+    # Server-side Origin check (CORS sa preklíkne pri preflight, ale Origin sa posiela aj na POST)
+    origin = request.headers.get("origin", "")
+    if settings.allowed_origins_list and origin not in settings.allowed_origins_list:
+        log.warning("/checkout odmietnutý — origin %r nie je povolený", origin)
+        raise HTTPException(status_code=403, detail="origin nie je povolený")
+
+    if not settings.allowed_price_ids_set:
+        raise HTTPException(
+            status_code=503,
+            detail="ALLOWED_PRICE_IDS nie je nakonfigurované — endpoint je vypnutý",
+        )
+
+    body = await request.json()
+    try:
+        req = CheckoutRequest(**body)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=e.errors()) from e
+
+    try:
+        result = create_checkout(req)
+    except ValueError as e:
+        # napr. price_id nie je v allowliste
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except stripe.StripeError as e:
+        log.exception("Stripe API zlyhalo v /checkout")
+        raise HTTPException(status_code=502, detail="Stripe API chyba") from e
 
     return JSONResponse(result)
 

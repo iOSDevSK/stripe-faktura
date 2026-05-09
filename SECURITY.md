@@ -13,6 +13,38 @@ Tento dokument popisuje, ako `stripe-faktura` chráni endpointy a dáta.
 | Útočník uhádne predvídateľné číslo faktúry (`20260001`) a stiahne PDF | HMAC token v PDF URL — bez tokenu 401 |
 | MITM na sieti | TLS terminuje reverse proxy (Coolify Traefik) — vždy HTTPS v produkcii |
 
+## Vrstva 0 — Checkout endpoint (`POST /checkout`)
+
+Tento endpoint je **verejne volateľný z frontendu** (musí byť — frontend formulár
+ho volá pred redirectom na Stripe). Musí byť teda chránený inak ako webhook.
+
+**Defense in depth:**
+
+1. **`ALLOWED_ORIGINS` allowlist.**
+   - CORS middleware blokuje cross-origin requests z neschválených domén.
+   - Server-side check `request.headers["origin"]` ako dodatočná vrstva
+     (CORS rieši browser, ale priame curl-y/serverové requesty obchádzajú CORS).
+   - Bez nakonfigurovaného `ALLOWED_ORIGINS` endpoint odmietne **všetky** požiadavky.
+
+2. **`ALLOWED_PRICE_IDS` allowlist.**
+   - Útočník môže poslať akýkoľvek `price_id` v body.
+   - Bez allowlistu by mohol vytvoriť 0 € fake produkt v Stripe a získať Customer
+     objekt s adresou skutočného používateľa zadarmo.
+   - Allowlist obmedzuje endpoint na produkčné price ID-čka.
+   - Bez nakonfigurovaného `ALLOWED_PRICE_IDS` endpoint vráti 503.
+
+3. **Validácia vstupu** (pydantic).
+   - IČO musí byť 8-ciferné.
+   - DIČ 9-10 cifier.
+   - IČ DPH formát `XX1234567890`.
+   - Email cez `email-validator`.
+   - URL polia (success_url, cancel_url) sú string — bez ďalšej validácie
+     (Stripe ich validuje sám).
+
+4. **Žiadny webhook side-effect.**
+   - Endpoint NIKDY nevystaví faktúru. Faktúra sa vystaví len po reálnej platbe
+     cez `checkout.session.completed` webhook (overený HMAC podpisom).
+
 ## Vrstva 1 — Webhook endpoint (`POST /webhook/stripe`)
 
 Stripe podpisuje každý webhook hlavičkou `Stripe-Signature: t=<ts>,v1=<hmac>`.

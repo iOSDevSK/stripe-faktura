@@ -178,11 +178,58 @@ nestiahne PDF — aj keď čísla faktúr sú predvídateľné (`20260001`, `202
 | Metóda | Cesta | Popis |
 |---|---|---|
 | `POST` | `/webhook/stripe` | Stripe webhook receiver. Overuje `Stripe-Signature`. |
+| `POST` | `/checkout` | Vytvorí Stripe Customer + Checkout Session s SK billing údajmi. |
 | `GET` | `/invoices` | Výpis faktúr (paginovaný). |
 | `GET` | `/invoices/{number}` | Metadáta faktúry ako JSON. |
 | `GET` | `/invoices/{number}/pdf` | Stiahne PDF. |
 | `GET` | `/healthz` | Kontrola dostupnosti. |
 | `GET` | `/docs` | Interaktívna OpenAPI dokumentácia (Swagger UI). |
+
+### `POST /checkout` — pre-checkout formulár
+
+Frontend (napr. `24design.sk`) zbiera billing údaje pred Stripe Checkoutom
+(SK zákon vyžaduje na faktúre IČO/DIČ/IČ DPH ktoré Stripe natívne nezbiera).
+Tento endpoint vytvorí Stripe Customer s SK metadata + Checkout Session,
+zákazník je redirectnutý na Stripe a stačí mu zadať len číslo karty.
+
+**Bezpečnosť** (defense in depth):
+- `ALLOWED_ORIGINS` env — whitelist frontend domén (Origin check + CORS)
+- `ALLOWED_PRICE_IDS` env — whitelist Stripe price ID (anti-tampering)
+- Validácia formátu IČO (8 cifier), DIČ (9-10 cifier), IČ DPH (`SK2024567890`)
+
+**Request body:**
+```json
+{
+  "price_id": "price_1TR5miQ1nUjRL12CV3uVek2D",
+  "quantity": 1,
+  "customer_type": "firma",
+  "email": "info@acme.sk",
+  "company_name": "Acme s.r.o.",
+  "ico": "12345678",
+  "dic": "2012345678",
+  "vat_id": "SK2012345678",
+  "address_line1": "Hlavná 1",
+  "address_city": "Bratislava",
+  "address_zip": "82104",
+  "address_country": "SK",
+  "success_url": "https://24design.sk/thank-you?session_id={CHECKOUT_SESSION_ID}",
+  "cancel_url": "https://24design.sk/cennik"
+}
+```
+
+Pre fyzickú osobu (`customer_type: "osoba"`) namiesto `company_name`/`ico`/`dic`/`vat_id`
+posli len `name`. Polia `dic` a `vat_id` sú vždy voliteľné.
+
+**Response 200:**
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_test_...",
+  "session_id": "cs_test_...",
+  "customer_id": "cus_..."
+}
+```
+
+Frontend len redirectne na `checkout_url`.
 
 Ak je nastavená premenná `READ_API_KEY`, všetky `GET /invoices*` endpointy
 vyžadujú hlavičku `X-API-Key`.

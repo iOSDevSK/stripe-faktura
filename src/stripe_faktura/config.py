@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     # Verejná URL aplikácie (pre linky v emaili). Napr. https://faktura.24design.sk
     base_url: str = ""
 
+    # Checkout endpoint — bezpečnostný allowlist
+    # Comma-separated zoznam origins ktorí smú volať POST /checkout.
+    # Príklad: "https://24design.sk,https://24design.cz"
+    allowed_origins: str = ""
+    # Comma-separated zoznam Stripe price_id ktoré smú byť použité v /checkout.
+    # Bráni útočníkovi vytvoriť session pre 0 € fake produkt.
+    # Príklad: "price_1TR5miQ1nUjRL12CV3uVek2D,price_1TR5mSQ1nUjRL12C1OgEUkYj"
+    allowed_price_ids: str = ""
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
@@ -104,6 +113,14 @@ class Settings(BaseSettings):
         if self.smtp_host:
             return "smtp"
         return "none"
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @property
+    def allowed_price_ids_set(self) -> set[str]:
+        return {p.strip() for p in self.allowed_price_ids.split(",") if p.strip()}
 
 
 _settings: Settings | None = None

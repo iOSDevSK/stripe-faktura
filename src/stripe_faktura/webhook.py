@@ -48,9 +48,11 @@ def _supplier_from_settings() -> Supplier:
         bank_name=s.supplier_bank_name,
         iban=s.supplier_iban,
         bic=s.supplier_bic,
+        ks=s.supplier_ks,
         email=s.supplier_email,
         phone=s.supplier_phone,
         logo_url=s.supplier_logo_url,
+        logo_path=s.supplier_logo_path,
     )
 
 

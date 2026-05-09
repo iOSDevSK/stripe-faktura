@@ -31,12 +31,16 @@ class Settings(BaseSettings):
     supplier_vat_registered: bool = False
     supplier_vat_id: str = ""
     supplier_registration: str = ""
-    supplier_bank_name: str
-    supplier_iban: str
+    supplier_bank_name: str = ""
+    supplier_iban: str = ""
     supplier_bic: str = ""
+    supplier_ks: str = ""           # konštantný symbol; pre faktúry "0308"
     supplier_email: str
     supplier_phone: str = ""
     supplier_logo_url: str = ""
+    # Lokálny súbor s logom — relatívne k templates/ adresáru, alebo absolutná cesta.
+    # Príklad: "logo-24design.svg" (bundled v repe). Má prednosť pred supplier_logo_url.
+    supplier_logo_path: str = ""
 
     # Faktúra
     invoice_number_format: str = "{year}{seq:04d}"

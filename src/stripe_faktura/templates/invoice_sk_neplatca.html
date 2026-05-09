@@ -9,7 +9,9 @@
 
 <div class="header">
   <div class="brand">
-    {% if invoice.supplier.logo_url %}
+    {% if invoice.supplier.logo_path %}
+      <img src="{{ invoice.supplier.logo_path }}" alt="{{ invoice.supplier.name }}">
+    {% elif invoice.supplier.logo_url %}
       <img src="{{ invoice.supplier.logo_url }}" alt="{{ invoice.supplier.name }}">
     {% else %}
       <div class="brand-text">{{ invoice.supplier.name }}</div>
@@ -81,12 +83,14 @@
   <div class="row">
     <div><span class="label">Spôsob úhrady:</span><strong>{{ invoice.payment_method }}</strong></div>
   </div>
+  {% if invoice.supplier.iban %}
   <div class="row" style="margin-top:1.5mm">
     <div><span class="label">IBAN:</span>{{ invoice.supplier.iban }}</div>
     {% if invoice.supplier.bic %}<div><span class="label">BIC:</span>{{ invoice.supplier.bic }}</div>{% endif %}
     <div><span class="label">VS:</span>{{ invoice.variable_symbol }}</div>
-    <div><span class="label">KS:</span>0308</div>
+    {% if invoice.supplier.ks %}<div><span class="label">KS:</span>{{ invoice.supplier.ks }}</div>{% endif %}
   </div>
+  {% endif %}
 </div>
 
 <table class="items">

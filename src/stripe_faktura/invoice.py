@@ -30,7 +30,9 @@ class Supplier:
     bic: str
     email: str
     phone: str
-    logo_url: str = ""
+    ks: str = ""                # konštantný symbol; ak prázdne, v PDF sa nezobrazí
+    logo_url: str = ""          # externé URL loga
+    logo_path: str = ""         # lokálna cesta (relatívna k templates/ alebo absolútna)
 
 
 @dataclass(frozen=True)

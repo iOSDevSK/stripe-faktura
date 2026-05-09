@@ -1,6 +1,6 @@
-"""Smoke test: WeasyPrint can render both templates without errors.
+"""Smoke test: WeasyPrint vie vyrenderovať obe šablóny bez chýb.
 
-Skipped automatically if WeasyPrint system deps (Cairo/Pango) are missing.
+Automaticky preskočí ak chýbajú systémové závislosti WeasyPrint (Cairo/Pango).
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import pytest
 
 from stripe_faktura.invoice import Address, Customer, Invoice, LineItem, Supplier
 
-weasyprint = pytest.importorskip("weasyprint")
+pytest.importorskip("weasyprint")
 
 
 def _make_invoice(*, vat_registered: bool) -> Invoice:
@@ -52,7 +52,7 @@ def _make_invoice(*, vat_registered: bool) -> Invoice:
     )
 
 
-def test_render_neplatca_pdf():
+def test_render_pdf_neplatca():
     from stripe_faktura.pdf import render_invoice_pdf
 
     pdf_bytes = render_invoice_pdf(_make_invoice(vat_registered=False))
@@ -60,7 +60,7 @@ def test_render_neplatca_pdf():
     assert len(pdf_bytes) > 5000
 
 
-def test_render_platca_pdf():
+def test_render_pdf_platca():
     from stripe_faktura.pdf import render_invoice_pdf
 
     pdf_bytes = render_invoice_pdf(_make_invoice(vat_registered=True))

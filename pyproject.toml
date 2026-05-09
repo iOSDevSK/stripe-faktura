@@ -1,14 +1,14 @@
 [project]
 name = "stripe-faktura"
 version = "0.1.0"
-description = "Slovak-compliant invoice generator for Stripe payments"
+description = "Generátor slovenských faktúr pre Stripe platby"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
 authors = [
     { name = "Filip Dvoran", email = "filip.dvoran@gmail.com" },
 ]
-keywords = ["stripe", "invoice", "slovakia", "fakturacia", "pdf", "fastapi"]
+keywords = ["stripe", "invoice", "faktura", "slovakia", "slovensko", "fakturacia", "pdf", "fastapi"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: FastAPI",
@@ -60,7 +60,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "TID"]
-ignore = ["E501"]  # line too long (we set 100 above; weasyprint inline CSS may exceed)
+ignore = ["E501"]  # dlhý riadok (limit 100; inline CSS môže prekročiť)
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

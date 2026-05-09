@@ -1,7 +1,7 @@
 FROM python:3.12-slim AS base
 
-# WeasyPrint runtime deps: Cairo, Pango, GDK-PixBuf, fonts
-# (see https://doc.courtbouillon.org/weasyprint/stable/first_steps.html)
+# Runtime závislosti pre WeasyPrint: Cairo, Pango, GDK-PixBuf, fonty
+# (pozri https://doc.courtbouillon.org/weasyprint/stable/first_steps.html)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \

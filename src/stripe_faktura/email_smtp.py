@@ -1,4 +1,4 @@
-"""Send invoice email via SMTP."""
+"""Posielanie emailu s faktúrou cez SMTP."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ from .invoice import Invoice
 
 
 def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> None:
-    """Send invoice as PDF attachment to the customer via SMTP."""
+    """Pošle faktúru ako PDF prílohu zákazníkovi cez SMTP."""
     settings = get_settings()
     if not settings.smtp_host:
-        raise RuntimeError("SMTP_HOST is not configured")
+        raise RuntimeError("SMTP_HOST nie je nakonfigurované")
     if not invoice.customer.email:
-        raise ValueError("customer.email is empty — cannot send")
+        raise ValueError("customer.email je prázdny — nedá sa odoslať")
 
     msg = EmailMessage()
     msg["Subject"] = f"Faktúra č. {invoice.number} — {settings.supplier_name}"

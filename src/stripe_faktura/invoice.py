@@ -1,9 +1,9 @@
-"""Invoice domain model — pure, framework-agnostic dataclasses."""
+"""Doménový model faktúry — čisté dataclasses, nezávislé od framework-u."""
 
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 
@@ -47,7 +47,7 @@ class Customer:
 class LineItem:
     description: str
     quantity: int
-    unit_price_minor: int   # in minor units (cents)
+    unit_price_minor: int   # v haléroch (centoch)
     currency: str
 
     @property
@@ -74,8 +74,8 @@ class Invoice:
     customer: Customer
     items: list[LineItem]
     currency: str
-    vat_rate: int                  # whole percent, e.g. 20
-    vat_registered: bool           # supplier VAT mode
+    vat_rate: int                  # celé percentá, napr. 20
+    vat_registered: bool           # režim DPH dodávateľa
     payment_method: str = "Platba kartou (Stripe)"
     is_paid: bool = True
     notes: str = ""
@@ -92,7 +92,7 @@ class Invoice:
     def vat_amount_minor(self) -> int:
         if not self.vat_registered:
             return 0
-        # VAT extracted from a gross-inclusive total: gross * rate / (100 + rate)
+        # DPH extrahovaná zo sumy s DPH: gross * sadzba / (100 + sadzba)
         gross = Decimal(self.subtotal_minor)
         rate = Decimal(self.vat_rate)
         vat = (gross * rate / (Decimal(100) + rate)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
@@ -104,7 +104,7 @@ class Invoice:
 
     @property
     def base_amount_minor(self) -> int:
-        # Net amount = gross - VAT (or whole if non-VAT)
+        # Základ = suma s DPH - DPH (alebo celá suma ak neplatca)
         return self.subtotal_minor - self.vat_amount_minor
 
     @property

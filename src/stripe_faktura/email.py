@@ -1,4 +1,4 @@
-"""Email dispatcher — picks Brevo or SMTP based on env config."""
+"""Email dispatcher — vyberie Brevo alebo SMTP podľa env konfigurácie."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from .invoice import Invoice
 
 
 def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> str:
-    """Dispatch to the configured provider. Returns the provider name used."""
+    """Posiela cez nakonfigurovaný provider. Vráti názov použitého providera."""
     settings = get_settings()
     provider = settings.email_provider
     if provider == "brevo":

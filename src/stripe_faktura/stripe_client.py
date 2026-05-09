@@ -1,12 +1,12 @@
-"""Thin wrapper around the Stripe SDK — fetch customer + line items.
+"""Tenký wrapper okolo Stripe SDK — načíta zákazníka + položky.
 
-Per project decision: Stripe is the single source of truth.
-- Customer name, email, address → stripe.Customer
-- Customer IČO          → customer.metadata['ico']
-- Customer DIČ          → customer.metadata['dic']
-- Customer IČ DPH       → customer.tax_ids (type='eu_vat')
-- Line items            → checkout_session.list_line_items
-- Payment date          → payment_intent.created
+Podľa rozhodnutia projektu: Stripe je jediný zdroj pravdy.
+- Meno, email, adresa zákazníka  → stripe.Customer
+- IČO zákazníka                   → customer.metadata['ico']
+- DIČ zákazníka                   → customer.metadata['dic']
+- IČ DPH zákazníka                → customer.tax_ids (type='eu_vat')
+- Položky                         → checkout_session.list_line_items
+- Dátum platby                    → payment_intent.created
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def fetch_line_items(session_id: str) -> list[stripe.LineItem]:
 
 
 def build_customer(stripe_customer: stripe.Customer) -> Customer:
-    """Convert Stripe Customer → domain Customer."""
+    """Konvertuje Stripe Customer → doménový Customer."""
     addr = stripe_customer.get("address") or {}
     address: Address | None = None
     if addr and addr.get("line1"):
@@ -56,7 +56,7 @@ def build_customer(stripe_customer: stripe.Customer) -> Customer:
     tax_ids = stripe_customer.get("tax_ids") or {}
     vat_id = ""
     for tid in tax_ids.get("data", []) if isinstance(tax_ids, dict) else []:
-        # Slovak EU VAT prefix is "SK..."; accept any eu_vat type
+        # Slovenské EU VAT začína na "SK..."; akceptujeme akýkoľvek typ eu_vat
         if tid.get("type") == "eu_vat":
             vat_id = tid.get("value") or ""
             break
@@ -72,9 +72,9 @@ def build_customer(stripe_customer: stripe.Customer) -> Customer:
 
 
 def build_line_items(stripe_items: list[stripe.LineItem], currency: str) -> list[LineItem]:
-    """Convert Stripe LineItems → domain LineItems.
+    """Konvertuje Stripe LineItems → doménové LineItems.
 
-    Stripe's `amount_total` on a line item is the gross total (qty * unit) in minor units.
+    Stripe `amount_total` na položke je suma s DPH (qty * unit) v haléroch.
     """
     out: list[LineItem] = []
     for li in stripe_items:
@@ -82,7 +82,7 @@ def build_line_items(stripe_items: list[stripe.LineItem], currency: str) -> list
         amount_total = int(li.get("amount_total") or 0)
         unit_minor = amount_total // qty if qty else amount_total
         description = li.get("description") or "Produkt"
-        # Prefer the canonical product name when available
+        # Uprednostni kanonický názov produktu ak je dostupný
         if "price" in li and li.price and li.price.get("product"):
             prod = li.price.get("product")
             if isinstance(prod, dict) and prod.get("name"):
@@ -99,7 +99,7 @@ def build_line_items(stripe_items: list[stripe.LineItem], currency: str) -> list
 
 
 def session_paid_at(session: stripe.checkout.Session) -> dt.date:
-    """Return the payment date as a UTC date."""
+    """Vráti dátum platby ako UTC dátum."""
     pi = session.get("payment_intent")
     created = None
     if isinstance(pi, dict) and pi.get("created"):

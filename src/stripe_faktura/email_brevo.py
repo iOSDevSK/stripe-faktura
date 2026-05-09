@@ -1,4 +1,4 @@
-"""Send invoice email via Brevo Transactional API."""
+"""Posielanie emailu s faktúrou cez Brevo Transactional API."""
 
 from __future__ import annotations
 
@@ -14,16 +14,16 @@ _BREVO_API = "https://api.brevo.com/v3/smtp/email"
 
 
 def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
-    """Send invoice as PDF attachment to the customer.
+    """Pošle faktúru ako PDF prílohu zákazníkovi.
 
-    Returns Brevo's response body as dict. Caller is responsible for logging.
-    Raises httpx.HTTPStatusError on non-2xx.
+    Vracia odpoveď z Brevo ako dict. Caller je zodpovedný za logovanie.
+    Vyhodí httpx.HTTPStatusError pri non-2xx odpovedi.
     """
     settings = get_settings()
     if not settings.brevo_api_key:
-        raise RuntimeError("BREVO_API_KEY is not configured")
+        raise RuntimeError("BREVO_API_KEY nie je nakonfigurované")
     if not invoice.customer.email:
-        raise ValueError("customer.email is empty — cannot send")
+        raise ValueError("customer.email je prázdny — nedá sa odoslať")
 
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
     filename = f"faktura-{invoice.number}.pdf"

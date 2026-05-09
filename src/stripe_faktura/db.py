@@ -1,4 +1,4 @@
-"""SQLAlchemy setup and ORM models."""
+"""Setup SQLAlchemy a ORM modely pre záznamy faktúr."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class InvoiceRecord(Base):
     stripe_payment_intent_id = Column(String(128), nullable=True)
     customer_email = Column(String(320), nullable=True, index=True)
     customer_name = Column(String(255), nullable=True)
-    total_minor = Column(Integer, nullable=False)  # in minor units (cents)
+    total_minor = Column(Integer, nullable=False)  # v haléroch (centoch)
     currency = Column(String(8), nullable=False)
     vat_mode = Column(String(16), nullable=False)  # 'platca' | 'neplatca'
     pdf_path = Column(String(1024), nullable=False)
@@ -45,7 +45,7 @@ _SessionLocal: sessionmaker[Session] | None = None
 
 
 def _build_engine():
-    """Build SQLAlchemy engine respecting SQLite-specific connect args."""
+    """Postaví SQLAlchemy engine, rešpektuje SQLite-špecifické connect args."""
     url = get_settings().database_url
     connect_args: dict = {}
     if url.startswith("sqlite"):
@@ -54,7 +54,7 @@ def _build_engine():
 
 
 def init_db() -> None:
-    """Create tables. Call once at app startup."""
+    """Vytvorí tabuľky. Volaj raz pri štarte aplikácie."""
     global _engine, _SessionLocal
     if _engine is None:
         _engine = _build_engine()
@@ -63,7 +63,7 @@ def init_db() -> None:
 
 
 def get_session() -> Session:
-    """FastAPI dependency-style accessor; caller is responsible for closing."""
+    """Pomocník pre prístup k DB session — caller je zodpovedný za zatvorenie."""
     if _SessionLocal is None:
         init_db()
     assert _SessionLocal is not None

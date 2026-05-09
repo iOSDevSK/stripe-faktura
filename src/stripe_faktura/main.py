@@ -1,4 +1,4 @@
-"""FastAPI app — routes and startup."""
+"""FastAPI aplikácia — routy a startup."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import logging
 from typing import Annotated
 
 import stripe
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import desc, select
 
@@ -20,7 +20,7 @@ logging.basicConfig(level=get_settings().log_level)
 app = FastAPI(
     title="stripe-faktura",
     version=__version__,
-    description="Slovak-compliant invoice generator for Stripe payments",
+    description="Generátor slovenských faktúr pre Stripe platby",
     docs_url="/docs",
     redoc_url=None,
 )
@@ -29,7 +29,7 @@ app = FastAPI(
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
-    log.info("stripe-faktura %s started", __version__)
+    log.info("stripe-faktura %s spustená", __version__)
 
 
 @app.get("/healthz")
@@ -50,21 +50,21 @@ async def stripe_webhook(request: Request) -> JSONResponse:
             secret=settings.stripe_webhook_secret,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail="invalid payload") from e
+        raise HTTPException(status_code=400, detail="neplatné telo požiadavky") from e
     except stripe.SignatureVerificationError as e:
-        raise HTTPException(status_code=400, detail="invalid signature") from e
+        raise HTTPException(status_code=400, detail="neplatný podpis") from e
 
     event_type = event["type"]
     if event_type != "checkout.session.completed":
-        # Acknowledge without action — Stripe expects 2xx
+        # Potvrdíme príjem bez akcie — Stripe očakáva 2xx
         return JSONResponse({"ok": True, "ignored": event_type})
 
     try:
         result = webhook.handle_checkout_completed(event)
-    except Exception:  # noqa: BLE001
-        log.exception("webhook handler failed for event %s", event["id"])
-        # Returning 5xx makes Stripe retry, which we want
-        raise HTTPException(status_code=500, detail="handler error")
+    except Exception as e:  # noqa: BLE001
+        log.exception("spracovanie webhooku zlyhalo pre event %s", event["id"])
+        # 5xx spôsobí že Stripe pošle webhook znova — to chceme
+        raise HTTPException(status_code=500, detail="chyba spracovania") from e
 
     return JSONResponse(result)
 
@@ -72,7 +72,7 @@ async def stripe_webhook(request: Request) -> JSONResponse:
 def _check_read_auth(x_api_key: str | None) -> None:
     expected = get_settings().read_api_key
     if expected and x_api_key != expected:
-        raise HTTPException(status_code=401, detail="unauthorized")
+        raise HTTPException(status_code=401, detail="neautorizovaný prístup")
 
 
 @app.get("/invoices")
@@ -116,7 +116,7 @@ def get_invoice(
     try:
         r = db.scalars(select(InvoiceRecord).where(InvoiceRecord.number == number)).first()
         if not r:
-            raise HTTPException(status_code=404, detail="invoice not found")
+            raise HTTPException(status_code=404, detail="faktúra nenájdená")
         return {
             "number": r.number,
             "customer_email": r.customer_email,
@@ -145,7 +145,7 @@ def get_invoice_pdf(
     try:
         r = db.scalars(select(InvoiceRecord).where(InvoiceRecord.number == number)).first()
         if not r:
-            raise HTTPException(status_code=404, detail="invoice not found")
+            raise HTTPException(status_code=404, detail="faktúra nenájdená")
         return FileResponse(
             r.pdf_path,
             media_type="application/pdf",

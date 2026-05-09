@@ -1,8 +1,7 @@
-"""Settings loaded from environment variables (and .env in dev)."""
+"""Konfigurácia načítaná z environment premenných (a `.env` v dev móde)."""
 
 from __future__ import annotations
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +17,7 @@ class Settings(BaseSettings):
     stripe_api_key: str
     stripe_webhook_secret: str
 
-    # Supplier
+    # Dodávateľ
     supplier_name: str
     supplier_street: str
     supplier_city: str
@@ -36,15 +35,15 @@ class Settings(BaseSettings):
     supplier_phone: str = ""
     supplier_logo_url: str = ""
 
-    # Invoice
+    # Faktúra
     invoice_number_format: str = "{year}{seq:04d}"
     invoice_language: str = "sk"
     vat_rate: int = 20
 
-    # Database
+    # Databáza
     database_url: str = "sqlite:////data/invoices.db"
 
-    # Storage
+    # Úložisko
     storage_backend: str = "local"  # local | s3
     storage_local_path: str = "/data/pdfs"
     s3_endpoint: str = ""
@@ -52,12 +51,12 @@ class Settings(BaseSettings):
     s3_key: str = ""
     s3_secret: str = ""
 
-    # Email — Brevo (option A)
+    # Email — Brevo (možnosť A)
     brevo_api_key: str = ""
     brevo_sender_email: str = ""
     brevo_sender_name: str = ""
 
-    # Email — SMTP (option B)
+    # Email — SMTP (možnosť B)
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -65,7 +64,7 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_from_name: str = ""
 
-    # Auth
+    # Autentifikácia
     read_api_key: str = ""
 
     # Server

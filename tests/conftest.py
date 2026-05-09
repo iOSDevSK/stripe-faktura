@@ -1,4 +1,4 @@
-"""Test fixtures — minimal env so config.Settings doesn't crash on import."""
+"""Test fixtures — minimálne env premenné aby config.Settings nepadlo pri importe."""
 
 from __future__ import annotations
 

@@ -1,14 +1,14 @@
-"""Stripe webhook handler — orchestrates the full pipeline.
+"""Handler Stripe webhooku — orchestrácia celého pipeline.
 
-Flow on `checkout.session.completed`:
-  1. Verify signature (handled by FastAPI route via stripe.Webhook.construct_event).
-  2. Skip if metadata.no_invoice == "true" (escape hatch for vouchers etc.).
-  3. Skip if we already have an invoice for this session_id (idempotent).
-  4. Pull customer + line items from Stripe.
-  5. Build Invoice domain object.
-  6. Render PDF.
-  7. Persist (storage + DB).
-  8. Email customer (best-effort; failure does NOT roll back the invoice).
+Tok pri `checkout.session.completed`:
+  1. Overí podpis (rieši FastAPI route cez stripe.Webhook.construct_event).
+  2. Preskočí ak metadata.no_invoice == "true" (escape hatch pre vouchery atď.).
+  3. Preskočí ak pre tento session_id už faktúra existuje (idempotentnosť).
+  4. Načíta zákazníka + položky zo Stripe.
+  5. Postaví doménový Invoice objekt.
+  6. Vyrenderuje PDF.
+  7. Uloží (storage + DB).
+  8. Pošle email zákazníkovi (best-effort; zlyhanie NEROBÍ rollback faktúry).
 """
 
 from __future__ import annotations
@@ -21,8 +21,7 @@ from sqlalchemy import select
 
 from . import email as email_dispatcher
 from . import pdf as pdf_render
-from . import storage
-from . import stripe_client
+from . import storage, stripe_client
 from .config import get_settings
 from .db import InvoiceRecord, get_session
 from .invoice import Address, Invoice, Supplier
@@ -62,7 +61,7 @@ def handle_checkout_completed(event: stripe.Event) -> dict:
     metadata = session.get("metadata") or {}
 
     if str(metadata.get("no_invoice", "")).lower() == "true":
-        log.info("skip session %s: metadata.no_invoice=true", session_id)
+        log.info("preskakujem session %s: metadata.no_invoice=true", session_id)
         return {"ok": True, "skipped": "no_invoice flag"}
 
     db = get_session()
@@ -71,19 +70,25 @@ def handle_checkout_completed(event: stripe.Event) -> dict:
             select(InvoiceRecord).where(InvoiceRecord.stripe_session_id == session_id)
         ).first()
         if existing:
-            log.info("skip session %s: invoice %s already exists", session_id, existing.number)
+            log.info(
+                "preskakujem session %s: faktúra %s už existuje",
+                session_id,
+                existing.number,
+            )
             return {"ok": True, "skipped": "duplicate", "invoice_number": existing.number}
 
-        # Re-fetch session with expansions (the webhook payload is shallow)
+        # Znovu načítame session s expansiami (webhook payload je plytký)
         full_session = stripe_client.fetch_session(session_id)
 
         customer_id = full_session.get("customer")
         if isinstance(customer_id, dict):
-            stripe_customer = customer_id  # already expanded
+            stripe_customer = customer_id  # už expandovaný
         elif customer_id:
             stripe_customer = stripe_client.fetch_customer(customer_id)
         else:
-            log.warning("session %s has no customer; falling back to customer_details", session_id)
+            log.warning(
+                "session %s nemá zákazníka; fallback na customer_details", session_id
+            )
             cd = full_session.get("customer_details") or {}
             stripe_customer = {
                 "name": cd.get("name") or "",
@@ -98,10 +103,10 @@ def handle_checkout_completed(event: stripe.Event) -> dict:
         items = stripe_client.build_line_items(stripe_client.fetch_line_items(session_id), currency)
 
         if not items:
-            log.warning("session %s has no line items; skipping", session_id)
+            log.warning("session %s nemá žiadne položky; preskakujem", session_id)
             return {"ok": False, "error": "no line items"}
 
-        # Allocate invoice number atomically with the DB record insertion
+        # Atomická alokácia čísla faktúry spolu s DB záznamom
         number = next_invoice_number(db)
         issued_at = stripe_client.session_paid_at(full_session)
 
@@ -142,7 +147,7 @@ def handle_checkout_completed(event: stripe.Event) -> dict:
         db.add(record)
         db.commit()
 
-        # Best-effort email (failure logged but does not fail the webhook)
+        # Best-effort email (zlyhanie zalogujeme, webhook neumrie)
         emailed = False
         if settings.email_enabled and customer.email:
             try:
@@ -154,7 +159,7 @@ def handle_checkout_completed(event: stripe.Event) -> dict:
                     record.emailed_at = dt.datetime.utcnow()
                     db.commit()
             except Exception as exc:  # noqa: BLE001
-                log.exception("email send failed for invoice %s: %s", number, exc)
+                log.exception("odoslanie emailu zlyhalo pre faktúru %s: %s", number, exc)
 
         return {
             "ok": True,

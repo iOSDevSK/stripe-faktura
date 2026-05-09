@@ -1,86 +1,86 @@
-# Slovak invoice — legal requirements
+# Slovenská faktúra — zákonné náležitosti
 
-Quick reference for what Slovak law requires on a B2B / B2C invoice.
-This is **informational** — verify with your accountant for your specific case.
+Rýchla referencia, čo slovenský zákon vyžaduje na B2B / B2C faktúre.
+Tento dokument je **informatívny** — pre tvoj konkrétny prípad si over s účtovníkom.
 
-## Sources
+## Zdroje
 
-- **Zákon č. 222/2004 Z. z.** — o dani z pridanej hodnoty (VAT Act)
-- **Zákon č. 431/2002 Z. z.** — o účtovníctve (Accounting Act)
-- **Zákon č. 18/2018 Z. z.** — o ochrane osobných údajov (GDPR-equivalent)
+- **Zákon č. 222/2004 Z. z.** — o dani z pridanej hodnoty (zákon o DPH)
+- **Zákon č. 431/2002 Z. z.** — o účtovníctve
+- **Zákon č. 18/2018 Z. z.** — o ochrane osobných údajov (slovenský ekvivalent GDPR)
 
-## Required fields (§ 74 z.č. 222/2004 — VAT payer)
+## Povinné polia (§ 74 z. č. 222/2004 — pre platcu DPH)
 
-A VAT-payer invoice must include:
+Faktúra platcu DPH musí obsahovať:
 
-1. Obchodné meno a adresa **dodávateľa**
+1. Obchodné meno a adresu **dodávateľa**
 2. **IČ DPH dodávateľa**
-3. Obchodné meno a adresa **odberateľa**
-4. **IČ DPH odberateľa** (if assigned)
-5. **Poradové číslo faktúry**
-6. **Dátum dodania tovaru/služby** (DUZP — alebo dátum prijatia platby ak skôr)
+3. Obchodné meno a adresu **odberateľa**
+4. **IČ DPH odberateľa** (ak má pridelené)
+5. **Poradové číslo** faktúry
+6. **Dátum dodania** tovaru/služby (DUZP — alebo dátum prijatia platby ak skôr)
 7. **Dátum vystavenia** faktúry
 8. **Množstvo a druh** dodaného tovaru/služby
 9. **Základ dane** pre každú sadzbu DPH zvlášť (čistá cena)
 10. **Sadzba DPH** alebo informácia o oslobodení od DPH s odkazom na § zákona
 11. **Suma DPH** v EUR
-12. (For special cases) odkaz na faktúru, ktorá bola opravená — pri dobropisoch
+12. (Pri špeciálnych prípadoch) odkaz na faktúru, ktorá bola opravená — pri dobropisoch
 
-## Required fields (zákon o účtovníctve — neplatca DPH)
+## Povinné polia (zákon o účtovníctve — pre neplatcu DPH)
 
-If the supplier is **not a VAT payer**, the invoice (or "doklad") must include:
+Ak dodávateľ **nie je platcom DPH**, faktúra (resp. "doklad") musí obsahovať:
 
 1. Označenie dokladu (typicky "Faktúra")
 2. Obsah a peňažnú sumu
 3. Dátum vyhotovenia
 4. Dátum uskutočnenia účtovného prípadu (≈ DUZP)
-5. **Identifikácia dodávateľa a odberateľa** (meno/firma + adresa, IČO ak má)
+5. **Identifikáciu dodávateľa a odberateľa** (meno/firma + adresa, IČO ak má)
 6. Podpisový záznam (pri elektronických faktúrach netreba)
 
-Plus the **legal disclosure**:
+Plus **zákonné oznámenie**:
 > "Nie som platiteľom DPH podľa § 4 zákona č. 222/2004 Z. z. v platnom znení."
 
-## Conventionally also included (not legally required, but expected)
+## Konvenčne tiež zahrnuté (zákonom nepovinné, ale očakávané)
 
-| Field | Purpose |
+| Pole | Účel |
 |---|---|
-| **Variabilný symbol** | Numeric ID for matching the bank transfer (typically the invoice number) |
-| **Konštantný symbol** | `0308` for invoices |
-| **Špecifický symbol** | Optional, sometimes used for project codes |
-| **IBAN + BIC** | So the customer can pay |
-| **Dátum splatnosti** | Due date (= issue date when prepaid) |
+| **Variabilný symbol** | Číselný identifikátor pre spárovanie bankového prevodu (typicky číslo faktúry) |
+| **Konštantný symbol** | `0308` pre faktúry |
+| **Špecifický symbol** | Voliteľné, niekedy projektový kód |
+| **IBAN + BIC** | Aby zákazník vedel uhradiť |
+| **Dátum splatnosti** | Termín úhrady (= dátum vystavenia ak vopred uhradené) |
 | **Spôsob úhrady** | "Prevodom" / "Platba kartou" / "Hotovosť" |
-| **Pečiatka a podpis** | Required only on paper; e-invoices don't need them |
-| **Zápis v obchodnom registri** | Required on all business correspondence by § 3a Obch. zák. |
+| **Pečiatka a podpis** | Povinné len pri papierových; e-faktúry nepotrebujú |
+| **Zápis v obchodnom registri** | Povinné na všetkých obchodných listinách podľa § 3a Obch. zák. |
 
-## Stripe-specific notes
+## Špecifické pre Stripe
 
-- **Variabilný symbol** must be numeric and ≤10 digits.
-  Use the invoice number; if your format includes letters/dashes, strip them.
-  (`stripe_faktura.numbering.variable_symbol_from()` does this.)
-- **DUZP** for digital services = the moment of payment (Stripe `payment_intent.created`).
-- **Currency**: invoice can be issued in any currency, but if you're a Slovak VAT payer,
-  the **VAT amount must be expressed in EUR** even on a foreign-currency invoice
-  (use the ECB reference rate of the DUZP date).
+- **Variabilný symbol** musí byť numerický a ≤ 10 cifier.
+  Použi číslo faktúry; ak tvoj formát obsahuje písmená/pomlčky, odstráň ich.
+  (`stripe_faktura.numbering.variable_symbol_from()` to robí.)
+- **DUZP** pre digitálne služby = okamih platby (Stripe `payment_intent.created`).
+- **Mena**: faktúra môže byť vystavená v akejkoľvek mene, ale ak si slovenský platca DPH,
+  **suma DPH musí byť vyjadrená v EUR** aj na faktúre v cudzej mene
+  (použi referenčný kurz ECB k DUZP).
 
-## Reverse charge (B2B EU)
+## Prenos daňovej povinnosti (B2B EU)
 
-When invoicing a VAT-registered EU business outside Slovakia:
-- Don't charge VAT.
-- Add the legal text:
+Pri fakturácii VAT-registered EU firmám mimo Slovenska:
+- Neúčtuj DPH.
+- Pridaj zákonný text:
   > "Prenesenie daňovej povinnosti — Reverse charge (čl. 196 smernice 2006/112/ES)"
-- Include both parties' VAT IDs.
-- Report it in your **VAT recapitulative statement** (Súhrnný výkaz).
+- Uveď IČ DPH oboch strán.
+- Vykáž to v **Súhrnnom výkaze DPH**.
 
-`stripe-faktura` v0.1 does **not** automate reverse charge logic — you'd need to
-set `SUPPLIER_VAT_REGISTERED=false` for non-EU sales, or manually adjust.
-Improvement scheduled for v0.3.
+`stripe-faktura` v0.1 reverse charge logiku **nedokáže** zautomatizovať — pre
+predaj mimo SK nastav `SUPPLIER_VAT_REGISTERED=false`, alebo manuálne uprav.
+Vylepšenie je v pláne pre v0.3.
 
-## Storage retention
+## Archivácia
 
-Slovak Accounting Act § 35 requires invoice retention for:
-- **10 years** (general accounting documents)
-- **20 years** for VAT records of "long-term tangible assets"
+Zákon o účtovníctve § 35 vyžaduje archiváciu faktúr:
+- **10 rokov** (všeobecné účtovné doklady)
+- **20 rokov** pre DPH záznamy "dlhodobého hmotného majetku"
 
-`stripe-faktura` stores PDFs on the configured volume forever (no automatic
-deletion). Backup that volume.
+`stripe-faktura` ukladá PDF na nakonfigurovaný volume natrvalo (žiadne
+automatické mazanie). Tento volume zálohuj.

@@ -1,4 +1,4 @@
-"""Year-resetting sequential invoice numbering, transactional via SQLite/Postgres."""
+"""Sekvenčné číslovanie faktúr s ročným resetom, transakčné v SQLite/Postgres."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from .db import NumberSequence
 
 def next_invoice_number(session: Session, *, now: dt.datetime | None = None) -> str:
     """
-    Return the next invoice number formatted via INVOICE_NUMBER_FORMAT.
+    Vráti nasledujúce číslo faktúry naformátované podľa INVOICE_NUMBER_FORMAT.
 
-    Sequence resets each calendar year. Concurrency-safe within a single DB
-    transaction (caller commits). For multi-replica deployments, use Postgres
-    with SELECT FOR UPDATE — adapt this function accordingly.
+    Sekvencia sa resetuje každý kalendárny rok. Bezpečné pri konkurencii v rámci
+    jednej DB transakcie (caller commitne). Pre multi-replica deployment použi
+    Postgres so SELECT FOR UPDATE — túto funkciu zodpovedajúco uprav.
     """
     fmt = get_settings().invoice_number_format
     now = now or dt.datetime.utcnow()
@@ -37,8 +37,8 @@ def next_invoice_number(session: Session, *, now: dt.datetime | None = None) -> 
 
 def variable_symbol_from(invoice_number: str) -> str:
     """
-    Slovak Variabilný symbol must be numeric (max 10 digits). Strip non-digits
-    from the invoice number to produce a valid VS.
+    Slovenský variabilný symbol musí byť numerický (max 10 cifier). Z čísla
+    faktúry vyhodí všetky nečíslicové znaky a vráti posledných 10 cifier.
     """
     digits = "".join(ch for ch in invoice_number if ch.isdigit())
     return digits[-10:] if len(digits) > 10 else digits

@@ -1,4 +1,4 @@
-"""Test VAT extraction math on the Invoice domain object."""
+"""Test extrakcie DPH z doménového Invoice objektu."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def _invoice(items: list[LineItem], *, vat_registered: bool, vat_rate: int = 20)
     )
 
 
-def test_neplatca_no_vat():
+def test_neplatca_dph_bez_dane():
     inv = _invoice(
         [LineItem("Web", 1, 34900, "eur")],
         vat_registered=False,
@@ -55,8 +55,8 @@ def test_neplatca_no_vat():
     assert inv.total_minor == 34900
 
 
-def test_platca_vat_extracted_from_gross():
-    # 349,00 € total, VAT 20% extracted: base = 290,83 €, VAT = 58,17 €
+def test_platca_dph_extrahovanie_zo_sumy_s_dph():
+    # 349,00 € spolu, DPH 20% extrahovaná: základ = 290,83 €, DPH = 58,17 €
     inv = _invoice(
         [LineItem("Web", 1, 34900, "eur")],
         vat_registered=True,
@@ -68,13 +68,13 @@ def test_platca_vat_extracted_from_gross():
     assert inv.base_amount_minor + inv.vat_amount_minor == inv.total_minor
 
 
-def test_platca_multi_item():
+def test_platca_dph_viac_poloziek():
     items = [
-        LineItem("A", 2, 1000, "eur"),  # 20,00 € total
-        LineItem("B", 1, 500, "eur"),   # 5,00 € total
+        LineItem("A", 2, 1000, "eur"),  # 20,00 € spolu
+        LineItem("B", 1, 500, "eur"),   # 5,00 € spolu
     ]
     inv = _invoice(items, vat_registered=True, vat_rate=20)
-    # gross 25,00 € = base 20,83 € + VAT 4,17 €
+    # spolu 25,00 € = základ 20,83 € + DPH 4,17 €
     assert inv.subtotal_minor == 2500
     assert inv.vat_amount_minor == 417
     assert inv.base_amount_minor == 2083

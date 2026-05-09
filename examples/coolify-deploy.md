@@ -1,36 +1,36 @@
-# Deploying stripe-faktura on Coolify
+# Nasadenie stripe-faktura na Coolify
 
-Step-by-step for any Coolify v4+ instance.
+Krok-za-krokom pre akúkoľvek Coolify v4+ inštanciu.
 
-## 1. Create the application
+## 1. Vytvor aplikáciu
 
-In Coolify dashboard:
+V Coolify dashboarde:
 
-1. Project → **+ New Resource** → **Public Repository** (or **Private GitHub App** if you've installed Coolify on your GitHub account).
-2. Repository: `https://github.com/iOSDevSK/stripe-faktura` (or your fork).
-3. Branch: `main`
-4. Build pack: **Dockerfile** (auto-detected from the `Dockerfile` in repo root).
-5. Domain: e.g. `faktura.example.com`.
+1. Project → **+ New Resource** → **Public Repository** (alebo **Private GitHub App** ak máš Coolify napojené na svoj GitHub účet).
+2. Repository: `https://github.com/iOSDevSK/stripe-faktura` (alebo tvoj fork).
+3. Vetva: `main`
+4. Build pack: **Dockerfile** (autodetekcia z `Dockerfile` v koreňi repa).
+5. Doména: napr. `faktura.example.com`.
 6. Port: `8000`.
 
-## 2. Add a persistent volume
+## 2. Pridaj trvalý volume
 
-In the new app's **Storage** tab:
+V karte **Storage** novej aplikácie:
 
-- Click **+ Add** → **Persistent Volume**.
+- Klikni **+ Add** → **Persistent Volume**.
 - Mount path: `/data`
-- Size: 1 GB (raise as your invoice archive grows).
+- Veľkosť: 1 GB (zvýš keď ti rastie archív faktúr).
 
-This stores the SQLite DB + all generated PDFs. Surviving redeploys.
+Tu sa ukladá SQLite DB + všetky vygenerované PDF. Prežije redeploy.
 
-## 3. Configure environment variables
+## 3. Nakonfiguruj environment premenné
 
-Copy the keys from `.env.example` into Coolify's **Environment Variables**.
-At a minimum:
+Skopíruj kľúče z `.env.example` do **Environment Variables** v Coolify.
+Minimálne:
 
 ```
 STRIPE_API_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...   # filled in step 5
+STRIPE_WEBHOOK_SECRET=whsec_...   # vyplníš v kroku 5
 
 SUPPLIER_NAME=...
 SUPPLIER_STREET=...
@@ -44,43 +44,43 @@ SUPPLIER_IBAN=...
 SUPPLIER_BIC=...
 SUPPLIER_EMAIL=...
 
-# Pick one email path:
+# Vyber jednu email cestu:
 BREVO_API_KEY=xkeysib-...
-BREVO_SENDER_EMAIL=hello@yourcompany.sk
-BREVO_SENDER_NAME=Your Company
+BREVO_SENDER_EMAIL=hello@tvojafirma.sk
+BREVO_SENDER_NAME=Tvoja firma
 ```
 
-Click **Save** → **Redeploy**.
+Klikni **Save** → **Redeploy**.
 
-## 4. Verify health
+## 4. Over dostupnosť
 
 ```bash
 curl https://faktura.example.com/healthz
 # {"status":"ok","version":"0.1.0"}
 ```
 
-If you see a Cloudflare 502 or similar, check Coolify logs for the container.
-Likely missing env vars (config validation fails on startup).
+Ak vidíš Cloudflare 502 alebo podobne, skontroluj logy containera v Coolify.
+Pravdepodobne chýbajú env premenné (validácia konfigurácie pri štarte zlyhá).
 
-## 5. Register the Stripe webhook
+## 5. Zaregistruj Stripe webhook
 
-In Stripe Dashboard → **Developers → Webhooks → + Add endpoint**:
+V Stripe Dashboarde → **Developers → Webhooks → + Add endpoint**:
 
 - Endpoint URL: `https://faktura.example.com/webhook/stripe`
-- Events to send: `checkout.session.completed`
-- Save → copy the **Signing secret** (`whsec_...`) into the
-  `STRIPE_WEBHOOK_SECRET` env var in Coolify → redeploy.
+- Udalosti: `checkout.session.completed`
+- Save → skopíruj **Signing secret** (`whsec_...`) do
+  `STRIPE_WEBHOOK_SECRET` env premennej v Coolify → redeploy.
 
-## 6. Behind Cloudflare?
+## 6. Za Cloudflare-om?
 
-If `faktura.example.com` is proxied by Cloudflare (orange cloud), make sure:
+Ak je `faktura.example.com` proxied cez Cloudflare (oranžový mrak), uisti sa že:
 
-- **Bot Fight Mode** is **OFF** (or scope a Skip rule for this hostname);
-  Stripe-Signature requests look bot-ish to Cloudflare's heuristics.
-- **Cache Rules**: not strictly needed (the app sets `cache-control: no-cache`),
-  but adding a "Bypass cache" rule for this hostname is a nice safety net.
+- **Bot Fight Mode** je **VYPNUTÝ** (alebo daj Skip rule pre tento hostname);
+  Stripe-Signature requesty môžu CF heuristikam vyzerať ako boti.
+- **Cache Rules**: nie je striktne potrebné (app posiela `cache-control: no-cache`),
+  ale "Bypass cache" rule pre tento hostname je príjemná poistka.
 
-## 7. (Optional) Restrict reads
+## 7. (Voliteľné) Obmedz čítanie
 
-Set `READ_API_KEY=...` to require an `X-API-Key` header on all `GET /invoices*`
-routes. The Stripe webhook is always open (Stripe authenticates via signature).
+Nastav `READ_API_KEY=...` aby všetky `GET /invoices*` routy vyžadovali hlavičku
+`X-API-Key`. Stripe webhook je vždy otvorený (Stripe sa autentifikuje cez podpis).

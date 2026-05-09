@@ -1,4 +1,4 @@
-"""Render an Invoice to a PDF via Jinja2 + WeasyPrint."""
+"""Vyrenderuje Invoice do PDF cez Jinja2 + WeasyPrint."""
 
 from __future__ import annotations
 
@@ -20,25 +20,25 @@ _env = Environment(
 
 
 def _format_money(amount: int | float, currency: str = "EUR") -> str:
-    """Format minor-units integer as `1 234,56 €` (SK convention)."""
+    """Sformátuje sumu v haléroch ako `1 234,56 €` (slovenská konvencia)."""
     if isinstance(amount, int):
         whole, frac = divmod(amount, 100)
     else:
-        # Decimal/float: split at decimal point
+        # Decimal/float: rozdelí podľa desatinnej čiarky
         whole = int(amount)
         frac = int(round((float(amount) - whole) * 100))
     sign = "-" if whole < 0 else ""
     whole = abs(whole)
-    s = f"{whole:,}".replace(",", " ")  # non-breaking space as thousands sep
+    s = f"{whole:,}".replace(",", " ")  # medzera ako tisícny oddeľovač
     sym = "€" if currency.upper() == "EUR" else currency.upper()
-    return f"{sign}{s},{frac:02d} {sym}"
+    return f"{sign}{s},{frac:02d} {sym}"
 
 
 _env.filters["money"] = _format_money
 
 
 def render_invoice_pdf(invoice: Invoice) -> bytes:
-    """Pick the right template based on VAT mode, render HTML, produce PDF."""
+    """Vyber správnu šablónu podľa režimu DPH, vyrenderuj HTML, vyrob PDF."""
     template_name = (
         "invoice_sk_platca.html" if invoice.vat_registered else "invoice_sk_neplatca.html"
     )

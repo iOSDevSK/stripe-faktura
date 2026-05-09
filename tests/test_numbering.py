@@ -1,4 +1,4 @@
-"""Test sequential invoice numbering with year reset."""
+"""Test sekvenčného číslovania faktúr s ročným resetom."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def _session_factory(url: str):
     return sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
-def test_sequence_starts_at_one(tmp_db_url):
+def test_sekvencia_zacina_jednotkou(tmp_db_url):
     SessionLocal = _session_factory(tmp_db_url)
     s = SessionLocal()
     try:
@@ -28,7 +28,7 @@ def test_sequence_starts_at_one(tmp_db_url):
         s.close()
 
 
-def test_sequence_increments(tmp_db_url):
+def test_sekvencia_inkrementuje(tmp_db_url):
     SessionLocal = _session_factory(tmp_db_url)
     s = SessionLocal()
     try:
@@ -43,7 +43,7 @@ def test_sequence_increments(tmp_db_url):
         s.close()
 
 
-def test_sequence_resets_each_year(tmp_db_url):
+def test_sekvencia_resetuje_kazdy_rok(tmp_db_url):
     SessionLocal = _session_factory(tmp_db_url)
     s = SessionLocal()
     try:
@@ -60,7 +60,7 @@ def test_sequence_resets_each_year(tmp_db_url):
         s.close()
 
 
-def test_variable_symbol_strips_non_digits():
+def test_variabilny_symbol_odstrani_neciselne_znaky():
     assert variable_symbol_from("20260042") == "20260042"
     assert variable_symbol_from("FA-2026-0042") == "20260042"
     assert variable_symbol_from("2026/0042") == "20260042"

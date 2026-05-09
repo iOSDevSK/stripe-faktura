@@ -1,4 +1,4 @@
-"""PDF storage backend — local filesystem for MVP, S3 hookable later."""
+"""Backend pre úložisko PDF — pre MVP lokálny filesystem, S3 pripravený neskôr."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from .config import get_settings
 
 
 def store_pdf(*, year: int, invoice_number: str, pdf_bytes: bytes) -> str:
-    """Persist PDF and return its absolute path (or s3 URL later)."""
+    """Uloží PDF a vráti jeho absolútnu cestu (alebo s3 URL neskôr)."""
     settings = get_settings()
     if settings.storage_backend != "local":
-        raise NotImplementedError(f"storage_backend={settings.storage_backend} not yet supported")
+        raise NotImplementedError(f"storage_backend={settings.storage_backend} zatiaľ nie je podporované")
 
     base = Path(settings.storage_local_path) / str(year)
     base.mkdir(parents=True, exist_ok=True)

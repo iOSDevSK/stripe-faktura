@@ -33,9 +33,11 @@ def _api_get(path: str, params: dict | None = None) -> dict:
 
 
 def fetch_session(session_id: str) -> dict:
+    # `customer.tax_ids` MUSÍ byť explicit expand — bez neho Stripe vráti
+    # customer dict bez tax_ids poľa, takže IČ DPH neprejde do faktúry.
     return _api_get(
         f"/checkout/sessions/{session_id}",
-        {"expand[]": ["customer", "payment_intent"]},
+        {"expand[]": ["customer", "customer.tax_ids", "payment_intent"]},
     )
 
 

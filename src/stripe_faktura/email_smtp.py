@@ -19,12 +19,16 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> None:
         raise ValueError("customer.email je prázdny — nedá sa odoslať")
 
     msg = EmailMessage()
-    msg["Subject"] = f"Faktúra č. {invoice.number} — {settings.supplier_name}"
+    customer_label = (invoice.customer.name or invoice.customer.email or "—").strip()
+    msg["Subject"] = f"Faktúra č. {invoice.number} — {customer_label}"
     msg["From"] = (
         f"{settings.smtp_from_name or settings.supplier_name} "
         f"<{settings.smtp_from_email or settings.supplier_email}>"
     )
     msg["To"] = invoice.customer.email
+    bcc = settings.admin_bcc_list
+    if bcc:
+        msg["Bcc"] = ", ".join(bcc)
 
     pdf_url = pdf_token.pdf_url(invoice.number) if settings.base_url else ""
     link_section = (

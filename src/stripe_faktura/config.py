@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     brevo_sender_email: str = ""
     brevo_sender_name: str = ""
 
+    # Comma-separated zoznam admin emailov ktoré dostanú BCC kópiu
+    # každej odoslanej zákazníckej faktúry (s rovnakým PDF v prílohe).
+    # Príklad: "hello@24design.sk,filip@designreadystudio.com"
+    # Prázdne = žiadna admin kópia.
+    admin_bcc_emails: str = ""
+
     # Email — SMTP (možnosť B)
     smtp_host: str = ""
     smtp_port: int = 587
@@ -117,6 +123,10 @@ class Settings(BaseSettings):
         if self.smtp_host:
             return "smtp"
         return "none"
+
+    @property
+    def admin_bcc_list(self) -> list[str]:
+        return [e.strip() for e in self.admin_bcc_emails.split(",") if e.strip()]
 
     @property
     def allowed_origins_list(self) -> list[str]:

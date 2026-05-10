@@ -29,7 +29,10 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
     filename = f"faktura-{invoice.number}.pdf"
 
-    subject = f"Faktúra č. {invoice.number} — {settings.supplier_name}"
+    # Predmet uvádza meno zákazníka (alebo email ako fallback) — admin
+    # tak vie vo svojom inboxe okamžite identifikovať komu fa patrí.
+    customer_label = (invoice.customer.name or invoice.customer.email or "—").strip()
+    subject = f"Faktúra č. {invoice.number} — {customer_label}"
 
     # Verejný HMAC-podpísaný link pre opätovné stiahnutie (ak je BASE_URL nastavený)
     pdf_url = pdf_token.pdf_url(invoice.number) if settings.base_url else ""
@@ -48,7 +51,7 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
         f"{settings.supplier_email}"
     )
 
-    payload = {
+    payload: dict[str, Any] = {
         "sender": {
             "email": settings.brevo_sender_email or settings.supplier_email,
             "name": settings.brevo_sender_name or settings.supplier_name,
@@ -58,6 +61,10 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
         "textContent": body_text,
         "attachment": [{"name": filename, "content": pdf_b64}],
     }
+    # Admin BCC kópia pre evidenciu — admin dostane to isté PDF ako klient.
+    bcc = settings.admin_bcc_list
+    if bcc:
+        payload["bcc"] = [{"email": e} for e in bcc]
 
     with httpx.Client(timeout=30.0) as client:
         r = client.post(

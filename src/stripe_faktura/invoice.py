@@ -43,6 +43,7 @@ class Customer:
     ico: str = ""
     dic: str = ""
     vat_id: str = ""
+    phone: str = ""
 
 
 @dataclass(frozen=True)

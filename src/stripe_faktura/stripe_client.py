@@ -115,6 +115,7 @@ def build_customer(stripe_customer: dict) -> Customer:
         ico=str(metadata.get("ico") or ""),
         dic=str(metadata.get("dic") or ""),
         vat_id=vat_id,
+        phone=stripe_customer.get("phone") or "",
     )
 
 
@@ -138,6 +139,7 @@ def merge_customer_billing(*, primary: Customer, fallback: Customer) -> Customer
         ico=primary.ico or fallback.ico,
         dic=primary.dic or fallback.dic,
         vat_id=primary.vat_id or fallback.vat_id,
+        phone=primary.phone or fallback.phone,
     )
 
 

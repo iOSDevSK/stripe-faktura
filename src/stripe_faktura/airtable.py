@@ -60,6 +60,7 @@ def upsert_invoice(*, invoice: Invoice, stripe_session_id: str) -> None:
         "Faktúra link": pdf_token.pdf_url(invoice.number) if s.base_url else "",
         "Zákazník": cust.name or cust.email or "",
         "Email": cust.email or "",
+        "Telefón": cust.phone or "",
         "Typ zákazníka": _customer_type_label(cust.ico),
         "Adresa": _format_address(cust.address),
         "IČO": cust.ico or "",

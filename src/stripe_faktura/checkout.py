@@ -39,6 +39,7 @@ class CheckoutRequest(BaseModel):
     customer_type: Literal["firma", "osoba"]
 
     email: EmailStr
+    phone: str | None = None
 
     # Common (povinné pre oba typy)
     address_line1: str = Field(min_length=1, max_length=255)
@@ -140,6 +141,8 @@ def _customer_payload(req: CheckoutRequest) -> dict:
         },
         "metadata": metadata,
     }
+    if req.phone and req.phone.strip():
+        payload["phone"] = req.phone.strip()
     return payload
 
 

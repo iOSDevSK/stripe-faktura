@@ -71,6 +71,8 @@ def upsert_invoice(*, invoice: Invoice, stripe_session_id: str) -> None:
     # nasadil predtým (napr. project_input description)
     fields = {k: v for k, v in fields.items() if v not in ("", None)}
 
+    if "Stripe session ID" not in fields:
+        return  # session_id zmizol počas filtrovania → nenechaj vytvoriť sirotu
     payload = {
         "performUpsert": {"fieldsToMergeOn": ["Stripe session ID"]},
         "records": [{"fields": fields}],
@@ -88,7 +90,17 @@ def upsert_invoice(*, invoice: Invoice, stripe_session_id: str) -> None:
             )
         if resp.status_code >= 300:
             log.warning(
-                "airtable upsert failed %s: %s", resp.status_code, resp.text[:300]
+                "airtable upsert FAILED %s sid=%s fields=%s resp=%s",
+                resp.status_code, stripe_session_id[:30],
+                list(fields.keys()), resp.text[:400],
+            )
+        else:
+            data = resp.json()
+            created = data.get("createdRecords") or []
+            updated = data.get("updatedRecords") or []
+            log.info(
+                "airtable upsert OK sid=%s created=%s updated=%s fields=%d",
+                stripe_session_id[:30], created, updated, len(fields),
             )
     except Exception as exc:  # noqa: BLE001
-        log.warning("airtable upsert exception: %r", exc)
+        log.warning("airtable upsert exception sid=%s: %r", stripe_session_id[:30], exc)

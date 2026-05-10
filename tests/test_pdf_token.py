@@ -37,3 +37,44 @@ def test_pdf_url_obsahuje_token():
     # Token zo URL musí prejsť overením
     token = url.split("?token=")[1]
     assert verify_pdf_token("20260001", token) is True
+
+
+def test_token_s_expiraciou_prejde_pred_uplynutim():
+    import time
+    exp = int(time.time()) + 60
+    t = make_pdf_token("20260001", exp=exp)
+    assert verify_pdf_token("20260001", t, exp=exp) is True
+
+
+def test_expirovany_token_neprejde():
+    import time
+    exp = int(time.time()) - 1
+    t = make_pdf_token("20260001", exp=exp)
+    assert verify_pdf_token("20260001", t, exp=exp) is False
+
+
+def test_token_bez_exp_neprejde_proti_overeniu_s_exp():
+    import time
+    exp = int(time.time()) + 60
+    t_no_exp = make_pdf_token("20260001")
+    # Server očakáva exp v HMAC, dostal token bez neho → fail
+    assert verify_pdf_token("20260001", t_no_exp, exp=exp) is False
+
+
+def test_klient_nemoze_predlzit_exp_swapom():
+    """Útočník chytí URL s exp=100 a skúsi exp=999999. Token je naviazaný
+    na pôvodné exp v HMAC, takže swap padne."""
+    import time
+    real_exp = int(time.time()) + 60
+    t = make_pdf_token("20260001", exp=real_exp)
+    forged_exp = real_exp + 86400
+    assert verify_pdf_token("20260001", t, exp=forged_exp) is False
+
+
+def test_pdf_url_s_ttl_obsahuje_exp():
+    url = pdf_url("20260001", ttl_seconds=300)
+    assert "&exp=" in url
+    # Roztiahni query a over
+    qs = url.split("?", 1)[1]
+    parts = dict(p.split("=", 1) for p in qs.split("&"))
+    assert verify_pdf_token("20260001", parts["token"], exp=int(parts["exp"])) is True

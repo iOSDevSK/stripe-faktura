@@ -330,15 +330,18 @@ async def admin_test_send_invoice(
 def get_invoice_pdf(
     number: str,
     token: Annotated[str | None, Query()] = None,
+    exp: Annotated[int | None, Query()] = None,
     x_api_key: Annotated[str | None, Header()] = None,
 ) -> Response:
     """Stiahnutie PDF — autorizácia jedným z dvoch spôsobov:
     1. `X-API-Key` hlavička s `READ_API_KEY` (pre admin / interné systémy).
     2. `?token=<HMAC>` query param (pre verejné linky v emailoch zákazníkom).
+       Voliteľne `&exp=<unix>` pre časovo obmedzený link — server odmietne
+       prístup po uplynutí `exp`.
     """
     settings = get_settings()
     api_key_ok = x_api_key == settings.read_api_key
-    token_ok = pdf_token.verify_pdf_token(number, token or "")
+    token_ok = pdf_token.verify_pdf_token(number, token or "", exp=exp)
     if not (api_key_ok or token_ok):
         raise HTTPException(status_code=401, detail="neautorizovaný prístup")
 

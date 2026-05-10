@@ -207,15 +207,17 @@ def handle_checkout_completed(event) -> dict:
         customer = stripe_client.build_customer(stripe_customer)
 
         # Voucher upgrade flow: ak €349 session aplikoval promotion_code z
-        # €49 dizajn-objednávky, dotiahni chýbajúce fakturačné polia
-        # (adresa, IČO, DIČ, IČ DPH) z pôvodného Customera. Stripe Payment
-        # Link tieto polia natívne nezbiera, takže by inak na upgrade
-        # faktúre chýbali.
+        # €49 dizajn-objednávky, použi DIZAJN Customera ako primárnu
+        # fakturačnú identitu (meno/firma, adresa, IČO, DIČ, IČ DPH).
+        # Stripe Payment Link na upgrade-e zachytí len meno z karty
+        # ("Filip Dvoran") a hrubú adresu — to nie je správna fakturačná
+        # identita. Klient zadal kompletné údaje pri €49 cez náš /checkout.
+        # Upgrade Customer slúži len ako fallback pre prázdne polia.
         design_customer_data = _resolve_design_customer(full_session)
         if design_customer_data:
             customer = stripe_client.merge_customer_billing(
-                primary=customer,
-                fallback=stripe_client.build_customer(design_customer_data),
+                primary=stripe_client.build_customer(design_customer_data),
+                fallback=customer,
             )
             log.info(
                 "session %s: prenesené billing údaje z dizajn-customera (voucher upgrade)",

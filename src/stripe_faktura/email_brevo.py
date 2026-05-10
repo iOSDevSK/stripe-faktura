@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from html import escape
 from typing import Any
 
 import httpx
@@ -36,19 +37,39 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
 
     # Verejný HMAC-podpísaný link pre opätovné stiahnutie (ak je BASE_URL nastavený)
     pdf_url = pdf_token.pdf_url(invoice.number) if settings.base_url else ""
-    link_section = (
+
+    # Plain-text fallback (klienti bez HTML)
+    link_text = (
         f"\n\nFaktúru môžete kedykoľvek znova stiahnuť na:\n{pdf_url}\n"
         if pdf_url else ""
     )
-
     body_text = (
         f"Dobrý deň,\n\n"
         f"v prílohe nájdete faktúru č. {invoice.number} za platbu prijatú dňa "
         f"{invoice.issued_at.isoformat()}.\n\n"
         f"Suma: {invoice.total:.2f} {invoice.currency.upper()}."
-        f"{link_section}\n\n"
+        f"{link_text}\n\n"
         f"S pozdravom,\n{settings.supplier_name}\n"
         f"{settings.supplier_email}"
+    )
+
+    # HTML verzia — link je clickable <a href>. Brevo posiela
+    # multipart/alternative keď dodáme oba; väčšina klientov vyrenderuje HTML.
+    link_html = (
+        f"<p>Faktúru môžete kedykoľvek znova stiahnuť na: "
+        f"<a href=\"{escape(pdf_url, quote=True)}\">{escape(pdf_url)}</a></p>"
+        if pdf_url else ""
+    )
+    body_html = (
+        f"<div style=\"font-family:system-ui,sans-serif;line-height:1.5;color:#1f2937\">"
+        f"<p>Dobrý deň,</p>"
+        f"<p>v prílohe nájdete faktúru č. <strong>{escape(invoice.number)}</strong> "
+        f"za platbu prijatú dňa {escape(invoice.issued_at.isoformat())}.</p>"
+        f"<p>Suma: <strong>{invoice.total:.2f} {escape(invoice.currency.upper())}</strong>.</p>"
+        f"{link_html}"
+        f"<p>S pozdravom,<br>{escape(settings.supplier_name)}<br>"
+        f"<a href=\"mailto:{escape(settings.supplier_email)}\">{escape(settings.supplier_email)}</a></p>"
+        f"</div>"
     )
 
     payload: dict[str, Any] = {
@@ -59,6 +80,7 @@ def send_invoice_email(*, invoice: Invoice, pdf_bytes: bytes) -> dict[str, Any]:
         "to": [{"email": invoice.customer.email, "name": invoice.customer.name or ""}],
         "subject": subject,
         "textContent": body_text,
+        "htmlContent": body_html,
         "attachment": [{"name": filename, "content": pdf_b64}],
     }
     # Admin BCC kópia pre evidenciu — admin dostane to isté PDF ako klient.

@@ -20,6 +20,7 @@ import logging
 import stripe
 from sqlalchemy import select
 
+from . import airtable
 from . import email as email_dispatcher
 from . import pdf as pdf_render
 from . import storage, stripe_client
@@ -281,6 +282,11 @@ def handle_checkout_completed(event) -> dict:
         )
         db.add(record)
         db.commit()
+
+        # Airtable CRM upsert — fakturačná identita + invoice link.
+        # Brevo backend predtým upsertol order/voucher info na ten istý
+        # `Stripe session ID` merge key, takže Airtable ich zlúči.
+        airtable.upsert_invoice(invoice=invoice, stripe_session_id=session_id)
 
         # Best-effort email (zlyhanie zalogujeme, webhook neumrie)
         emailed = False

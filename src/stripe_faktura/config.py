@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     # Prázdne = žiadna admin kópia.
     admin_bcc_emails: str = ""
 
+    # Airtable CRM — voliteľné. Ak je nakonfigurované, po vystavení faktúry
+    # sa upsertne row do tabuľky cez `Stripe session ID` ako merge key.
+    # Zápis je best-effort — pri zlyhaní sa loguje ale neblokuje webhook.
+    airtable_api_key: str = ""
+    airtable_base_id: str = ""
+    airtable_table_id: str = ""
+
     # Email — SMTP (možnosť B)
     smtp_host: str = ""
     smtp_port: int = 587

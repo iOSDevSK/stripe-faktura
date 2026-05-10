@@ -107,18 +107,22 @@ def _resolve_design_customer(full_session: dict) -> dict | None:
     """Ak upgrade session uplatnil voucher (promotion_code), dohľadá
     pôvodného €49 dizajn-Customera a vráti jeho Stripe payload.
 
-    Reťaz: session.total_details.breakdown.discounts[].discount.promotion_code
+    Reťaz: session.discounts[].promotion_code
     → PromotionCode.metadata.design_session_id
     → Checkout.Session.customer
     → Customer (s expandovanými tax_ids).
+
+    Pozn.: `session.discounts[]` je top-level a obsahuje promotion_code
+    ako string ID bez expansie. `total_details.breakdown.discounts[]`
+    je oddelená cesta dostupná iba s `expand[]=total_details.breakdown`,
+    inak je breakdown None — preto siaháme priamo na top-level discounts.
 
     Pri akomkoľvek zlyhaní v reťazi vráti None — caller spadne na
     upgrade-session Customer a invariant „faktúra sa vždy vystaví"
     zostáva zachovaný.
     """
-    breakdown = (full_session.get("total_details") or {}).get("breakdown") or {}
-    for d in breakdown.get("discounts") or []:
-        promo = (d.get("discount") or {}).get("promotion_code")
+    for d in full_session.get("discounts") or []:
+        promo = d.get("promotion_code")
         promo_id = promo if isinstance(promo, str) else (promo or {}).get("id")
         if not promo_id:
             continue

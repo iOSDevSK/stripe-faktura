@@ -103,6 +103,57 @@ def _to_dict(obj):
     return obj
 
 
+def _resolve_design_customer(full_session: dict) -> dict | None:
+    """Ak upgrade session uplatnil voucher (promotion_code), dohľadá
+    pôvodného €49 dizajn-Customera a vráti jeho Stripe payload.
+
+    Reťaz: session.total_details.breakdown.discounts[].discount.promotion_code
+    → PromotionCode.metadata.design_session_id
+    → Checkout.Session.customer
+    → Customer (s expandovanými tax_ids).
+
+    Pri akomkoľvek zlyhaní v reťazi vráti None — caller spadne na
+    upgrade-session Customer a invariant „faktúra sa vždy vystaví"
+    zostáva zachovaný.
+    """
+    breakdown = (full_session.get("total_details") or {}).get("breakdown") or {}
+    for d in breakdown.get("discounts") or []:
+        promo = (d.get("discount") or {}).get("promotion_code")
+        promo_id = promo if isinstance(promo, str) else (promo or {}).get("id")
+        if not promo_id:
+            continue
+        try:
+            promo_obj = stripe_client.fetch_promotion_code(promo_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("nepodarilo sa načítať promotion_code %s: %s", promo_id, exc)
+            return None
+        design_session_id = (promo_obj.get("metadata") or {}).get("design_session_id")
+        if not design_session_id:
+            return None
+        try:
+            design_session = stripe_client.fetch_session(design_session_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "nepodarilo sa načítať pôvodný design session %s: %s",
+                design_session_id, exc,
+            )
+            return None
+        design_customer = design_session.get("customer")
+        if isinstance(design_customer, dict):
+            return design_customer
+        if isinstance(design_customer, str):
+            try:
+                return stripe_client.fetch_customer(design_customer)
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "nepodarilo sa načítať pôvodný customer %s: %s",
+                    design_customer, exc,
+                )
+                return None
+        return None
+    return None
+
+
 def handle_checkout_completed(event) -> dict:
     settings = get_settings()
     # Stripe v11 StripeObject neexposí .get()/dict() — konvertujeme cez to_dict_recursive
@@ -149,6 +200,23 @@ def handle_checkout_completed(event) -> dict:
             }
 
         customer = stripe_client.build_customer(stripe_customer)
+
+        # Voucher upgrade flow: ak €349 session aplikoval promotion_code z
+        # €49 dizajn-objednávky, dotiahni chýbajúce fakturačné polia
+        # (adresa, IČO, DIČ, IČ DPH) z pôvodného Customera. Stripe Payment
+        # Link tieto polia natívne nezbiera, takže by inak na upgrade
+        # faktúre chýbali.
+        design_customer_data = _resolve_design_customer(full_session)
+        if design_customer_data:
+            customer = stripe_client.merge_customer_billing(
+                primary=customer,
+                fallback=stripe_client.build_customer(design_customer_data),
+            )
+            log.info(
+                "session %s: prenesené billing údaje z dizajn-customera (voucher upgrade)",
+                session_id,
+            )
+
         currency = (full_session.get("currency") or "eur").lower()
         items = stripe_client.build_line_items(stripe_client.fetch_line_items(session_id), currency)
 

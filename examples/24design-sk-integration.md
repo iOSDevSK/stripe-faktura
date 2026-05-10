@@ -102,7 +102,32 @@ Stripe paralelne pália obidva endpointy.
    - `GET https://faktura.24design.sk/invoices` zobrazuje nový riadok.
    - `GET https://faktura.24design.sk/invoices/20260001/pdf` vráti PDF.
 
-### 5. (Voliteľné) Preskočiť faktúru pri voucheroch / refundoch
+### 5. Voucher upgrade flow — automatický prenos fakturačných údajov
+
+Pri €349 upgrade objednávke s uplatneným voucherom (€49 promotion code)
+sa fakturačná identita zákazníka **automaticky dotiahne z pôvodnej €49
+dizajn-objednávky**:
+
+- Pôvodný €49 Customer bol vytvorený cez `/checkout` endpoint s plnou
+  identitou (meno/firma, adresa, IČO, DIČ, IČ DPH).
+- Promotion code má `metadata.design_session_id` ukazujúci na pôvodný
+  Checkout Session (nastavuje `helpers/brevo_order_webhook.py`).
+- Pri €349 webhook payload-e webhook handler vytiahne promo z
+  `total_details.breakdown.discounts[].discount.promotion_code`,
+  dohľadá pôvodného Customera a doplní chýbajúce polia na upgrade
+  Customera (Stripe Payment Link bežne IČO/DIČ nezbiera).
+- Pravidlo: ak klient pri upgrade checkoute zadal explicitnú hodnotu
+  (napr. inú adresu), tá vyhráva. Doplnia sa iba prázdne polia.
+
+Flow funguje aj keď klient zadá voucher kód manuálne v popup-e na
+preview-stránke — Stripe v oboch prípadoch zaznamená `promotion_code`
+do discount breakdown-u.
+
+Ak voucher chýba (priama €349 platba bez upgradu), použije sa štandardný
+flow: údaje musia prísť z Payment Linku → uisti sa že má zapnuté
+"Collect customer addresses" + "Collect tax IDs" (krok 2).
+
+### 6. (Voliteľné) Preskočiť faktúru pri voucheroch / refundoch
 
 Niektoré Stripe sessiony by faktúru produkovať nemali (zadarmo vouchery,
 interné testy a pod.). Nastav `metadata.no_invoice=true` na takých sessiónoch

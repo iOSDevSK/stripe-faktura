@@ -43,6 +43,10 @@ def fetch_customer(customer_id: str) -> dict:
     return _api_get(f"/customers/{customer_id}", {"expand[]": ["tax_ids"]})
 
 
+def fetch_promotion_code(promo_id: str) -> dict:
+    return _api_get(f"/promotion_codes/{promo_id}")
+
+
 def fetch_line_items(session_id: str) -> list[dict]:
     items: list[dict] = []
     starting_after = None
@@ -111,6 +115,29 @@ def build_customer(stripe_customer: dict) -> Customer:
         ico=str(metadata.get("ico") or ""),
         dic=str(metadata.get("dic") or ""),
         vat_id=vat_id,
+    )
+
+
+def merge_customer_billing(*, primary: Customer, fallback: Customer) -> Customer:
+    """Vyplní prázdne polia `primary` zákazníka hodnotami z `fallback`.
+
+    Používané pri voucher upgrade flow: Stripe Payment Link pri €349
+    objednávke vytvára čerstvý Customer ktorý typicky nemá IČO/DIČ
+    (Stripe ich pre SK natívne nezbiera) a často ani úplnú adresu.
+    Pôvodný €49 dizajn-Customer bol vytvorený cez náš /checkout endpoint
+    s plnou fakturačnou identitou, takže slúži ako fallback.
+
+    Pravidlo: explicitná hodnota na primary vyhráva (rešpektujeme to čo
+    klient zadal pri upgrade checkoute), prázdne polia sa doplnia z
+    fallback-u.
+    """
+    return Customer(
+        name=primary.name or fallback.name,
+        email=primary.email or fallback.email,
+        address=primary.address or fallback.address,
+        ico=primary.ico or fallback.ico,
+        dic=primary.dic or fallback.dic,
+        vat_id=primary.vat_id or fallback.vat_id,
     )
 
 

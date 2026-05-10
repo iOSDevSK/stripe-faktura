@@ -33,9 +33,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy source
 COPY src/ ./src/
 
-# Persistent data volume (SQLite + PDFs)
+# Data directory (SQLite + PDFs). Volume mount musí konfigurovať orchestrátor
+# (Coolify Persistent Storage / docker-compose `volumes:`). VOLUME directive
+# zámerne nepoužívame — Coolify build pack `dockerfile` ho interpretuje ako
+# anonymný volume a vytvorí nový pri každom rebuilde, čo zhodí dáta.
 RUN mkdir -p /data/pdfs && chmod 755 /data
-VOLUME ["/data"]
 
 ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1

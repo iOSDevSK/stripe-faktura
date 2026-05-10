@@ -23,7 +23,7 @@ from sqlalchemy import select
 from . import airtable
 from . import email as email_dispatcher
 from . import pdf as pdf_render
-from . import storage, stripe_client
+from . import storage, stripe_client, telegram
 from .config import get_settings
 from .db import InvoiceRecord, get_session
 from .invoice import Address, Invoice, Supplier
@@ -287,6 +287,9 @@ def handle_checkout_completed(event) -> dict:
         # Brevo backend predtým upsertol order/voucher info na ten istý
         # `Stripe session ID` merge key, takže Airtable ich zlúči.
         airtable.upsert_invoice(invoice=invoice, stripe_session_id=session_id)
+
+        # Telegram — krátka správa s číslom FA + download linkom (best-effort)
+        telegram.notify_invoice_issued(invoice)
 
         # Best-effort email (zlyhanie zalogujeme, webhook neumrie)
         emailed = False

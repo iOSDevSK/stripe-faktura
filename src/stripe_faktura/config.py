@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     airtable_base_id: str = ""
     airtable_table_id: str = ""
 
+    # Telegram notifikácie — voliteľné. Po vystavení FA sa pošle krátka
+    # správa s číslom faktúry a HMAC-podpísaným download linkom.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     # Email — SMTP (možnosť B)
     smtp_host: str = ""
     smtp_port: int = 587

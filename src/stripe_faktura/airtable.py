@@ -28,19 +28,6 @@ def _customer_type_label(ico: str) -> str:
     return "Firma" if ico.strip() else "Fyzická osoba"
 
 
-def _format_address(addr: Any) -> str:
-    """Single-line / multi-line adresa do plain textu pre Airtable."""
-    if not addr:
-        return ""
-    parts = [
-        addr.line1,
-        addr.line2,
-        f"{addr.zip} {addr.city}".strip(),
-        addr.country,
-    ]
-    return "\n".join(p for p in parts if p)
-
-
 def upsert_invoice(*, invoice: Invoice, stripe_session_id: str) -> None:
     """Upsert fakturačné polia do Airtable po vystavení faktúry.
 
@@ -54,6 +41,7 @@ def upsert_invoice(*, invoice: Invoice, stripe_session_id: str) -> None:
         return
 
     cust = invoice.customer
+    addr = cust.address
     fields: dict[str, Any] = {
         "Stripe session ID": stripe_session_id,
         "Faktúra číslo": invoice.number,
@@ -62,7 +50,13 @@ def upsert_invoice(*, invoice: Invoice, stripe_session_id: str) -> None:
         "Email": cust.email or "",
         "Telefón": cust.phone or "",
         "Typ zákazníka": _customer_type_label(cust.ico),
-        "Adresa": _format_address(cust.address),
+        # Address goes into 4 separate fields (matches the deferred-invoicing
+        # flow schema; the old monolithic `Adresa` multilineText field was
+        # dropped). brevo backend writes the same 4 fields on /order-request.
+        "Adresa - ulica": (addr.line1 if addr else "") or "",
+        "Adresa - mesto": (addr.city if addr else "") or "",
+        "Adresa - PSČ": (addr.zip if addr else "") or "",
+        "Adresa - krajina": (addr.country if addr else "") or "",
         "IČO": cust.ico or "",
         "DIČ": cust.dic or "",
         "IČ DPH": cust.vat_id or "",

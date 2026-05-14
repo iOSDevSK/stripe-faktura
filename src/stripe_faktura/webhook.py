@@ -231,14 +231,58 @@ def handle_checkout_completed(event) -> dict:
             log.warning("session %s nemá žiadne položky; preskakujem", session_id)
             return {"ok": False, "error": "no line items"}
 
-        # Pripojíme user-ov vstup z modalu (URL alebo popis biznisu) do
-        # popisu prvej položky — max 50 znakov.
-        client_input = _decode_client_reference_id(full_session.get("client_reference_id"))
-        if client_input and items:
+        # Localised line item description = tier label + " — " + project input.
+        # Source priorities:
+        #   tier_label  ← session.metadata.product (set by our /checkout flows)
+        #                 → fall back to Stripe product name from line items.
+        #   project_input ← session.metadata.project_input (deferred flow)
+        #                 → session.client_reference_id b64url-decoded (legacy
+        #                   direct-checkout)
+        #                 → for €349 voucher upgrade: design session's same fields
+        product_meta = (metadata.get("product") or "").strip()
+        tier_label_sk = {
+            "design_concept_24": "Návrh dizajnu (24h)",
+            "done_for_you_247": "Web na kľúč (5–7 dní)",
+        }.get(product_meta, "")
+
+        # Resolve project_input from this session first.
+        project_input = (metadata.get("project_input") or "").strip()
+        if not project_input:
+            project_input = _decode_client_reference_id(
+                full_session.get("client_reference_id")
+            )
+        # For €349 voucher-applied upgrade, inherit from original design session.
+        if not project_input and product_meta == "done_for_you_247":
+            for d in full_session.get("discounts") or []:
+                promo = d.get("promotion_code")
+                promo_id = promo if isinstance(promo, str) else (promo or {}).get("id")
+                if not promo_id:
+                    continue
+                try:
+                    promo_obj = stripe_client.fetch_promotion_code(promo_id)
+                    design_sid = (promo_obj.get("metadata") or {}).get("design_session_id")
+                    if design_sid:
+                        design_session = stripe_client.fetch_session(design_sid)
+                        project_input = (
+                            (design_session.get("metadata") or {}).get("project_input") or ""
+                        ).strip() or _decode_client_reference_id(
+                            design_session.get("client_reference_id")
+                        )
+                        if project_input:
+                            break
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "design-session project_input lookup failed via promo %s: %s",
+                        promo_id, exc,
+                    )
+
+        if items and (tier_label_sk or project_input):
             from .invoice import LineItem  # local to avoid cycles
             head = items[0]
+            base = tier_label_sk or head.description
+            full_desc = f"{base} — {project_input}" if project_input else base
             items[0] = LineItem(
-                description=f"{head.description} — {client_input}",
+                description=full_desc,
                 quantity=head.quantity,
                 unit_price_minor=head.unit_price_minor,
                 currency=head.currency,
